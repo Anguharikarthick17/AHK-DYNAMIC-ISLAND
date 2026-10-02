@@ -137,6 +137,12 @@ public final class IslandLayoutEngine: @unchecked Sendable {
             
         case .notification:
             return isExpanded ? .largeEvent : .mediumEvent
+            
+        case .appActivity(let activity):
+            if isExpanded {
+                return .largeEvent
+            }
+            return activity.activityType.isOngoing ? .mediumEvent : .smallEvent
         }
     }
     
@@ -168,11 +174,20 @@ public final class IslandLayoutEngine: @unchecked Sendable {
             
         case .notification:
             return isExpanded ? CGSize(width: 330.0, height: 94.0) : CGSize(width: 280.0, height: 60.0)
+            
+        case .appActivity(let activity):
+            if isExpanded {
+                return CGSize(width: 310.0, height: 86.0)
+            }
+            if activity.activityType.isOngoing {
+                return CGSize(width: 235.0, height: 40.0)
+            }
+            return CGSize(width: 210.0, height: 38.0)
         }
     }
     
     private func calculateCornerRadius(for size: CGSize, tier: IslandSizeTier) -> CGFloat {
-        if size.height <= 38.0 {
+        if size.height <= 40.0 {
             return (size.height / 2.0).rounded()
         }
         return tier.cornerRadius

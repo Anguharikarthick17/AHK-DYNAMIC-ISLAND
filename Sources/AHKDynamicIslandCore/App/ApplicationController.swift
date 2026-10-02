@@ -9,7 +9,7 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
     public let menuBarController: MenuBarController
     public let performanceMonitor: PerformanceMonitor
     
-    // V0.2 Dynamic Activity Engines
+    // V0.2 & V0.3 Dynamic Activity Engines
     public let eventCoordinator: IslandEventCoordinator
     public let volumeMonitor: VolumeMonitor
     public let brightnessMonitor: BrightnessMonitor
@@ -19,17 +19,22 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
     public let fileTransferManager: FileTransferManager
     public let notificationCoordinator: ActivityNotificationCoordinator
     public let eventBus: AHKEventBus
+    public let activityRegistry: UniversalActivityRegistry
+    public let appObserver: UniversalApplicationObserver
     
     public init(
         islandWindowController: IslandWindowController = IslandWindowController(),
         menuBarController: MenuBarController = MenuBarController(),
         performanceMonitor: PerformanceMonitor = PerformanceMonitor.shared,
-        eventCoordinator: IslandEventCoordinator = IslandEventCoordinator()
+        eventCoordinator: IslandEventCoordinator = IslandEventCoordinator(),
+        activityRegistry: UniversalActivityRegistry = UniversalActivityRegistry.shared
     ) {
         self.islandWindowController = islandWindowController
         self.menuBarController = menuBarController
         self.performanceMonitor = performanceMonitor
         self.eventCoordinator = eventCoordinator
+        self.activityRegistry = activityRegistry
+        self.appObserver = UniversalApplicationObserver(registry: activityRegistry)
         
         self.volumeMonitor = VolumeMonitor()
         self.brightnessMonitor = BrightnessMonitor()
@@ -44,6 +49,7 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
         
         setupCoordination()
         wireActivityMonitors()
+        wireApplicationObserver()
     }
     
     private func setupCoordination() {
@@ -139,6 +145,25 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
         }
     }
     
+    private func wireApplicationObserver() {
+        appObserver.onApplicationActivityDetected = { [weak self] activity in
+            Task { @MainActor [weak self] in
+                self?.eventCoordinator.postActivity(.appActivity(activity: activity))
+            }
+        }
+        
+        appObserver.onApplicationTerminated = { [weak self] app in
+            Task { @MainActor [weak self] in
+                self?.eventCoordinator.removeActivities { activity in
+                    if case .appActivity(let a) = activity {
+                        return a.bundleIdentifier == app.bundleIdentifier
+                    }
+                    return false
+                }
+            }
+        }
+    }
+    
     private func setupDistributedCommands() {
         let center = DistributedNotificationCenter.default()
         
@@ -159,6 +184,7 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
         volumeMonitor.startMonitoring()
         brightnessMonitor.startMonitoring()
         batteryMonitor.startMonitoring()
+        appObserver.startObserving()
     }
     
     // MARK: - MenuBarControllerDelegate
@@ -174,7 +200,7 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
     public func menuBarDidRequestSettings() {
         let alert = NSAlert()
         alert.messageText = "AHK Dynamic Island — Settings"
-        alert.informativeText = "Version: 0.2 Unified Dynamic System\n\nActive Screen: \(islandWindowController.currentGeometry.hasNotch ? "MacBook Retina (Hardware Notch)" : "Standard Display (Fallback Anchor)")\nIdle Capsule: \(Int(islandWindowController.currentGeometry.collapsedSize.width))×\(Int(islandWindowController.currentGeometry.collapsedSize.height)) pt\n\nModules: Music, Volume, Brightness, Battery, Transfers, Downloads, Ecosystem."
+        alert.informativeText = "Version: 0.3 Master Release\nFeatures: AHK Live Capsule + Universal Mac Activity Intelligence\n\nActive Screen: \(islandWindowController.currentGeometry.hasNotch ? "MacBook Retina (Hardware Notch)" : "Standard Display (Fallback Anchor)")\nIdle Capsule: \(Int(islandWindowController.currentGeometry.collapsedSize.width))×\(Int(islandWindowController.currentGeometry.collapsedSize.height)) pt (AHK MAC)\n\nUniversal Activity: Dynamic discovery across any macOS app without hardcoding."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Done")
         alert.runModal()
@@ -183,7 +209,7 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
     public func menuBarDidRequestAbout() {
         let alert = NSAlert()
         alert.messageText = "About AHK Dynamic Island"
-        alert.informativeText = "AHK Dynamic Island v0.2\nNative Apple Silicon Dynamic Utility\n\nDesigned to almost disappear when idle and intelligently come alive when something matters."
+        alert.informativeText = "AHK Dynamic Island v0.3\nNative Apple Silicon Dynamic Utility\n\nAHK Live Capsule with persistent AHK MAC idle identity and Universal Mac Activity Intelligence."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

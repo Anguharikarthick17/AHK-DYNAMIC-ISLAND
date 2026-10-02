@@ -24,8 +24,9 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     
     // Modular Subviews
     private let idleView = NSView()
-    private let idleDot = NSView()
+    public let idleLabel = NSTextField(labelWithString: "AHK MAC")
     
+    public let appActivityView = AppActivityView()
     public let volumeView = VolumeView()
     public let brightnessView = BrightnessView()
     public let batteryView = BatteryView()
@@ -75,25 +76,45 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     
     private func setupIdleView() {
         idleView.translatesAutoresizingMaskIntoConstraints = false
-        idleDot.translatesAutoresizingMaskIntoConstraints = false
-        idleDot.wantsLayer = true
-        idleDot.layer?.cornerRadius = 2.0
-        idleDot.layer?.backgroundColor = NSColor(white: 0.85, alpha: 0.55).cgColor // Subtle idle glass micro-pill
+        idleLabel.translatesAutoresizingMaskIntoConstraints = false
+        idleLabel.isEditable = false
+        idleLabel.isSelectable = false
+        idleLabel.isBezeled = false
+        idleLabel.drawsBackground = false
+        idleLabel.alignment = .center
         
-        idleView.addSubview(idleDot)
+        let font = NSFont.systemFont(ofSize: 11.5, weight: .semibold)
+        let attrString = NSMutableAttributedString(string: "AHK MAC")
+        attrString.addAttributes([
+            .font: font,
+            .kern: 1.2
+        ], range: NSRange(location: 0, length: 7))
+        idleLabel.attributedStringValue = attrString
+        
+        idleView.addSubview(idleLabel)
         NSLayoutConstraint.activate([
-            idleDot.centerXAnchor.constraint(equalTo: idleView.centerXAnchor),
-            idleDot.centerYAnchor.constraint(equalTo: idleView.centerYAnchor),
-            idleDot.widthAnchor.constraint(equalToConstant: 16),
-            idleDot.heightAnchor.constraint(equalToConstant: 4)
+            idleLabel.centerXAnchor.constraint(equalTo: idleView.centerXAnchor),
+            idleLabel.centerYAnchor.constraint(equalTo: idleView.centerYAnchor)
         ])
+        
+        updateIdleAppearance()
+    }
+    
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateIdleAppearance()
+    }
+    
+    private func updateIdleAppearance() {
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        idleLabel.textColor = isDark ? NSColor(white: 0.94, alpha: 0.90) : NSColor(white: 0.12, alpha: 0.88)
     }
     
     private func setupModularViews() {
         nowPlayingView.delegate = self
         
         let allViews: [NSView] = [
-            idleView, volumeView, brightnessView, batteryView,
+            idleView, appActivityView, volumeView, brightnessView, batteryView,
             nowPlayingView, downloadView, fileTransferView, notificationView
         ]
         
@@ -162,10 +183,12 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
             activeTargetView = fileTransferView
         case .notification:
             activeTargetView = notificationView
+        case .appActivity:
+            activeTargetView = appActivityView
         }
         
         let allViews: [NSView] = [
-            idleView, volumeView, brightnessView, batteryView,
+            idleView, appActivityView, volumeView, brightnessView, batteryView,
             nowPlayingView, downloadView, fileTransferView, notificationView
         ]
         
@@ -178,6 +201,8 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         switch activity {
         case .idle:
             break
+        case .appActivity(let activity):
+            appActivityView.update(activity: activity, isExpanded: isExpanded)
         case .volume(let level, let isMuted):
             volumeView.update(level: level, isMuted: isMuted)
         case .brightness(let level):

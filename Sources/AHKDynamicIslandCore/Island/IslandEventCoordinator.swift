@@ -25,18 +25,39 @@ public final class IslandEventCoordinator {
             return
         }
         
+        // Transient HUD events (volume, brightness) temporarily preempt persistent activities
+        // unless preempted by a critical alert
+        if activity.isTransientHUD {
+            if activeActivity.priority < .criticalAlert {
+                if activeActivity != activity && !activeActivity.isTransientHUD {
+                    queuedActivities.append(activeActivity)
+                }
+                presentActivity(activity)
+                return
+            } else {
+                // Critical alert in progress; drop transient volume HUD
+                return
+            }
+        }
+        
         // If the new activity is of higher or equal priority, preempt current
         if activity.priority >= activeActivity.priority {
-            // If current was a persistent background activity (e.g. now playing), keep in queue
+            // If current was a persistent background activity (e.g. now playing or ongoing app activity), keep in queue
             if case .nowPlaying = activeActivity {
+                queuedActivities.append(activeActivity)
+            } else if case .appActivity(let currentApp) = activeActivity, currentApp.activityType.isOngoing {
                 queuedActivities.append(activeActivity)
             }
             presentActivity(activity)
         } else {
-            // Lower priority: queue if relevant (e.g. transfers/downloads)
+            // Lower priority: queue if relevant (e.g. transfers/downloads/ongoing activities)
             switch activity {
             case .download, .fileTransfer, .notification:
                 queuedActivities.append(activity)
+            case .appActivity(let app):
+                if app.activityType.isOngoing {
+                    queuedActivities.append(activity)
+                }
             default:
                 break // Drop transient volume/brightness if higher priority card is active
             }
@@ -53,6 +74,14 @@ public final class IslandEventCoordinator {
         } else {
             activeActivity = .idle
             onActivityChanged?(.idle)
+        }
+    }
+    
+    /// Removes activities matching a predicate from queue and clears current if it matches.
+    public func removeActivities(matching predicate: (IslandActivity) -> Bool) {
+        queuedActivities.removeAll(where: predicate)
+        if predicate(activeActivity) {
+            clearCurrentActivity()
         }
     }
     

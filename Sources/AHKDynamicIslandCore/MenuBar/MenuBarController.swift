@@ -120,7 +120,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     public func updateActivity(_ activity: IslandActivity) {
         switch activity {
         case .idle:
-            activityStatusItem.title = "Idle"
+            activityStatusItem.title = "Current Activity: AHK MAC"
+        case .appActivity(let app):
+            activityStatusItem.title = "\(app.applicationName): \(app.stateText ?? "Active")"
         case .volume(let level, let isMuted):
             activityStatusItem.title = isMuted ? "🔊 Volume Muted" : "🔊 Volume \(Int(level * 100))%"
         case .brightness(let level):

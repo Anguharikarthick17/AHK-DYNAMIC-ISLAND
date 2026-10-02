@@ -3,13 +3,21 @@ import Foundation
 /// Priority tiers for dynamic island activities.
 public enum ActivityPriority: Int, Comparable, Sendable {
     case idle = 0
+    case appActive = 5
     case volume = 10
     case brightness = 15
+    case appProcessing = 18
     case nowPlaying = 20
     case battery = 25
     case fileTransfer = 30
     case download = 40
     case criticalAlert = 50
+    
+    // Semantic priority aliases adhering to Section 21
+    public static let low = ActivityPriority.appActive
+    public static let medium = ActivityPriority.appProcessing
+    public static let high = ActivityPriority.volume
+    public static let critical = ActivityPriority.criticalAlert
     
     public static func < (lhs: ActivityPriority, rhs: ActivityPriority) -> Bool {
         return lhs.rawValue < rhs.rawValue
@@ -26,12 +34,15 @@ public enum IslandActivity: Equatable, Sendable {
     case download(state: DownloadState)
     case fileTransfer(state: FileTransferState)
     case notification(title: String, subtitle: String?, iconName: String?)
+    case appActivity(activity: UniversalAppActivity)
     
     /// Priority of this activity.
     public var priority: ActivityPriority {
         switch self {
         case .idle:
             return .idle
+        case .appActivity(let activity):
+            return activity.priority
         case .volume:
             return .volume
         case .brightness:
@@ -49,7 +60,7 @@ public enum IslandActivity: Equatable, Sendable {
         }
     }
     
-    /// Default display duration before auto-collapsing to idle.
+    /// Default display duration before auto-collapsing to idle or previous persistent state.
     public var autoDismissInterval: TimeInterval? {
         switch self {
         case .idle:
@@ -66,6 +77,24 @@ public enum IslandActivity: Equatable, Sendable {
             return state.isCompleted ? 2.0 : nil
         case .notification:
             return 3.5
+        case .appActivity(let activity):
+            if activity.activityType.isOngoing {
+                return nil // Persistent while actively building, rendering, playing, syncing
+            } else if activity.activityType == .completed {
+                return 2.0
+            } else {
+                return 3.0 // Generic active presentation (auto-collapses to idle AHK MAC)
+            }
+        }
+    }
+    
+    /// Whether this is a transient HUD event that temporarily interrupts persistent activities.
+    public var isTransientHUD: Bool {
+        switch self {
+        case .volume, .brightness:
+            return true
+        default:
+            return false
         }
     }
     
@@ -74,6 +103,8 @@ public enum IslandActivity: Equatable, Sendable {
         switch self {
         case .nowPlaying:
             return true
+        case .appActivity(let activity):
+            return activity.activityType == .mediaPlaying
         default:
             return false
         }
