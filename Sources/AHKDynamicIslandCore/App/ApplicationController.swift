@@ -151,41 +151,6 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
         center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.collapse"), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.islandWindowController.collapse() }
         }
-        
-        // Simulation hooks for verification
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.volume"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.volumeMonitor.simulateVolumeChange(level: 0.72, isMuted: false) }
-        }
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.brightness"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.brightnessMonitor.setBrightness(level: 0.68) }
-        }
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.music"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.nowPlayingManager.simulateTrack(title: "Midnight City", artist: "M83", isPlaying: true)
-            }
-        }
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.battery"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.batteryMonitor.simulateBattery(level: 0.84, isCharging: true, isPluggedIn: true) }
-        }
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.download"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                let id = self?.downloadManager.startDownload(filename: "Xcode_16.2.xip", totalBytes: 145 * 1024 * 1024)
-                if let id = id {
-                    self?.downloadManager.updateProgress(id: id, bytesReceived: 120 * 1024 * 1024)
-                }
-            }
-        }
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.transfer"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                let id = self?.fileTransferManager.startTransfer(filename: "Presentation.key", direction: .sending, totalBytes: 50 * 1024 * 1024)
-                if let id = id {
-                    self?.fileTransferManager.updateProgress(id: id, bytesTransferred: 35 * 1024 * 1024)
-                }
-            }
-        }
-        center.addObserver(forName: NSNotification.Name("com.ahk.dynamicisland.simulate.idle"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.eventCoordinator.clearCurrentActivity() }
-        }
     }
     
     /// Starts the application and event monitors.

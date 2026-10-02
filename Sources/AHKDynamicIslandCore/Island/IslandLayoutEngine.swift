@@ -146,10 +146,10 @@ public final class IslandLayoutEngine: @unchecked Sendable {
             return isExpanded ? CGSize(width: 340.0, height: 90.0) : IslandSizeTier.idle.defaultDimensions
             
         case .volume:
-            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 210.0, height: 36.0)
+            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 210.0, height: 38.0)
             
         case .brightness:
-            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 210.0, height: 36.0)
+            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 210.0, height: 38.0)
             
         case .battery(_, _, _, let isCritical):
             if isCritical {

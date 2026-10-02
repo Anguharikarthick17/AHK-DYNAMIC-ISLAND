@@ -120,19 +120,19 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     public func updateActivity(_ activity: IslandActivity) {
         switch activity {
         case .idle:
-            activityStatusItem.title = "Nothing active"
+            activityStatusItem.title = "Idle"
         case .volume(let level, let isMuted):
-            activityStatusItem.title = isMuted ? "Volume: Muted" : "Volume: \(Int(level * 100))%"
+            activityStatusItem.title = isMuted ? "🔊 Volume Muted" : "🔊 Volume \(Int(level * 100))%"
         case .brightness(let level):
-            activityStatusItem.title = "Brightness: \(Int(level * 100))%"
+            activityStatusItem.title = "☀️ Brightness \(Int(level * 100))%"
         case .battery(let level, let isCharging, _, _):
-            activityStatusItem.title = isCharging ? "Battery: ⚡ \(Int(level * 100))%" : "Battery: 🔋 \(Int(level * 100))%"
-        case .nowPlaying(let state):
-            activityStatusItem.title = "Music: \(state.title)"
+            activityStatusItem.title = isCharging ? "🔋 Battery \(Int(level * 100))% ⚡" : "🔋 Battery \(Int(level * 100))%"
+        case .nowPlaying:
+            activityStatusItem.title = "🎵 Music"
         case .download(let state):
-            activityStatusItem.title = state.isCompleted ? "Download: Complete" : "Download: \(state.filename) (\(state.formattedProgress))"
+            activityStatusItem.title = state.isCompleted ? "↓ Download Complete" : "↓ Downloading \(Int(state.progress * 100))%"
         case .fileTransfer(let state):
-            activityStatusItem.title = state.isCompleted ? "Transfer: Complete" : "Transfer: \(state.filename)"
+            activityStatusItem.title = state.isCompleted ? "✓ Transfer Complete" : "↑ Transfer: \(state.filename)"
         case .notification(let title, _, _):
             activityStatusItem.title = "Alert: \(title)"
         }

@@ -10,14 +10,14 @@ public protocol IslandViewDelegate: AnyObject {
 }
 
 /// Dynamic Island presentation view adapting size, content, and styling to the active activity.
+/// Encased in native Liquid Glass with responsive refraction and continuous adaptive geometry.
 public final class IslandView: NSView, NowPlayingViewDelegate {
     
     public weak var delegate: IslandViewDelegate?
     
-    // Container and Materials
+    // Container and Native Liquid Glass
     public let containerView = NSView()
-    private let visualEffectView = NSVisualEffectView()
-    private let darkTintView = NSView()
+    public let glassContainer = LiquidGlassContainerView()
     
     // Activity Container
     private let contentContainerView = NSView()
@@ -56,22 +56,13 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         containerView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(containerView)
         
-        // Liquid glass backdrop
-        visualEffectView.translatesAutoresizingMaskIntoConstraints = false
-        visualEffectView.material = .hudWindow
-        visualEffectView.blendingMode = .behindWindow
-        visualEffectView.state = .active
-        containerView.addSubview(visualEffectView)
+        // Liquid Glass container fills the entire visible capsule
+        glassContainer.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(glassContainer)
         
-        // Deep OLED dark tint
-        darkTintView.wantsLayer = true
-        darkTintView.layer?.backgroundColor = NSColor(white: 0.04, alpha: 0.94).cgColor
-        darkTintView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(darkTintView)
-        
-        // Content container
+        // Content container inside liquid glass
         contentContainerView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(contentContainerView)
+        glassContainer.contentView.addSubview(contentContainerView)
         
         setupIdleView()
         setupModularViews()
@@ -86,8 +77,8 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         idleView.translatesAutoresizingMaskIntoConstraints = false
         idleDot.translatesAutoresizingMaskIntoConstraints = false
         idleDot.wantsLayer = true
-        idleDot.layer?.cornerRadius = 2.5
-        idleDot.layer?.backgroundColor = NSColor(white: 0.75, alpha: 0.65).cgColor // Subtle idle accent
+        idleDot.layer?.cornerRadius = 2.0
+        idleDot.layer?.backgroundColor = NSColor(white: 0.85, alpha: 0.55).cgColor // Subtle idle glass micro-pill
         
         idleView.addSubview(idleDot)
         NSLayoutConstraint.activate([
@@ -99,12 +90,14 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     }
     
     private func setupModularViews() {
-        let modularViews: [NSView] = [
+        nowPlayingView.delegate = self
+        
+        let allViews: [NSView] = [
             idleView, volumeView, brightnessView, batteryView,
             nowPlayingView, downloadView, fileTransferView, notificationView
         ]
         
-        for view in modularViews {
+        for view in allViews {
             view.translatesAutoresizingMaskIntoConstraints = false
             view.isHidden = true
             contentContainerView.addSubview(view)
@@ -116,8 +109,6 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
                 view.bottomAnchor.constraint(equalTo: contentContainerView.bottomAnchor)
             ])
         }
-        
-        nowPlayingView.delegate = self
     }
     
     private func setupConstraints() {
@@ -127,28 +118,26 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
             containerView.topAnchor.constraint(equalTo: topAnchor),
             containerView.bottomAnchor.constraint(equalTo: bottomAnchor),
             
-            visualEffectView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            visualEffectView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            visualEffectView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            visualEffectView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            glassContainer.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            glassContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            glassContainer.topAnchor.constraint(equalTo: containerView.topAnchor),
+            glassContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
             
-            darkTintView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            darkTintView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            darkTintView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            darkTintView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            
-            contentContainerView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            contentContainerView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            contentContainerView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            contentContainerView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            contentContainerView.leadingAnchor.constraint(equalTo: glassContainer.contentView.leadingAnchor),
+            contentContainerView.trailingAnchor.constraint(equalTo: glassContainer.contentView.trailingAnchor),
+            contentContainerView.topAnchor.constraint(equalTo: glassContainer.contentView.topAnchor),
+            contentContainerView.bottomAnchor.constraint(equalTo: glassContainer.contentView.bottomAnchor)
         ])
     }
     
-    // MARK: - Activity Presentation
+    // MARK: - Presentation & State Updates
     
     public func present(activity: IslandActivity, isExpanded: Bool) {
         self.currentActivity = activity
         self.isExpanded = isExpanded
+        
+        // Update glass interactivity
+        glassContainer.isInteractive = (activity.isInteractive || isExpanded)
         
         showView(for: activity)
         updateActiveView(activity: activity, isExpanded: isExpanded)
@@ -207,64 +196,38 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     }
     
     public func applyLayout(size: CGSize, cornerRadius: CGFloat) {
-        guard let layer = containerView.layer else { return }
-        
-        layer.cornerCurve = .continuous
-        layer.masksToBounds = true
-        layer.cornerRadius = cornerRadius
-        
-        // Razor-sharp border highlight for visibility against all backgrounds
-        layer.borderWidth = 1.0
-        layer.borderColor = NSColor(white: 1.0, alpha: currentActivity == .idle ? 0.18 : 0.24).cgColor
-        
-        // Soft cinematic depth shadow
-        wantsLayer = true
-        self.layer?.shadowColor = NSColor.black.cgColor
-        self.layer?.shadowOpacity = currentActivity == .idle ? 0.32 : 0.46
-        self.layer?.shadowRadius = currentActivity == .idle ? 8.0 : 16.0
-        self.layer?.shadowOffset = CGSize(width: 0, height: -3)
+        glassContainer.cornerRadius = cornerRadius
+        containerView.layer?.cornerRadius = cornerRadius
+        containerView.layer?.cornerCurve = .continuous
     }
     
-    // MARK: - Hit Testing & Interaction
+    // MARK: - User Interaction
     
-    public override func hitTest(_ point: NSPoint) -> NSView? {
-        let pointInContainer = containerView.convert(point, from: self)
-        guard containerView.bounds.contains(pointInContainer) else {
-            return nil
-        }
-        return super.hitTest(point)
-    }
-    
-    public override func mouseUp(with event: NSEvent) {
-        let pointInView = convert(event.locationInWindow, from: nil)
-        let pointInContainer = containerView.convert(pointInView, from: self)
-        guard containerView.bounds.contains(pointInContainer) else {
-            super.mouseUp(with: event)
-            return
+    public override func mouseDown(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        
+        // If clicking inside interactive controls (like music buttons), let subviews handle
+        if isExpanded && currentActivity.isInteractive {
+            if let hit = hitTest(location), hit !== self && hit !== containerView && hit !== glassContainer {
+                super.mouseDown(with: event)
+                return
+            }
         }
         
-        // Pass click to buttons if clicked directly
-        let hit = hitTest(pointInView)
-        if hit is NSButton {
-            super.mouseUp(with: event)
-            return
-        }
-        
-        // If an activity is active, tapping toggles its expanded view or dismisses
         delegate?.islandViewDidRequestToggleExpandCollapse(self)
     }
     
     // MARK: - NowPlayingViewDelegate
     
     public func nowPlayingViewDidRequestTogglePlayPause(_ view: NowPlayingView) {
-        // Forwarded through coordinator
+        // Forwarded through manager
     }
     
     public func nowPlayingViewDidRequestNextTrack(_ view: NowPlayingView) {
-        // Forwarded through coordinator
+        // Forwarded through manager
     }
     
     public func nowPlayingViewDidRequestPreviousTrack(_ view: NowPlayingView) {
-        // Forwarded through coordinator
+        // Forwarded through manager
     }
 }

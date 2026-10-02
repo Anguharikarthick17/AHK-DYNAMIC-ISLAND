@@ -68,6 +68,16 @@ public enum IslandActivity: Equatable, Sendable {
             return 3.5
         }
     }
+    
+    /// Whether this activity contains interactive elements (e.g. media controls).
+    public var isInteractive: Bool {
+        switch self {
+        case .nowPlaying:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 /// Represents the presentation state of the dynamic island.

@@ -32,18 +32,18 @@ final class DynamicSizingTests: XCTestCase {
     func testVolumeSmallEventSize() {
         let spec = engine.layoutSpec(for: .volume(level: 0.7, isMuted: false), isExpanded: false, screenGeometry: screenGeometry)
         XCTAssertEqual(spec.size.width, 210.0, accuracy: 0.1)
-        XCTAssertEqual(spec.size.height, 36.0, accuracy: 0.1)
-        XCTAssertEqual(spec.cornerRadius, 18.0, accuracy: 0.1)
+        XCTAssertEqual(spec.size.height, 38.0, accuracy: 0.1)
+        XCTAssertEqual(spec.cornerRadius, 19.0, accuracy: 0.1)
         XCTAssertEqual(spec.tier, IslandSizeTier.smallEvent)
         XCTAssertEqual(spec.frame.maxY, 1068.0, accuracy: 0.1)
-        XCTAssertEqual(spec.frame.minY, 1032.0, accuracy: 0.1)
+        XCTAssertEqual(spec.frame.minY, 1030.0, accuracy: 0.1)
     }
     
     func testBrightnessEventSize() {
         let spec = engine.layoutSpec(for: .brightness(level: 0.65), isExpanded: false, screenGeometry: screenGeometry)
         XCTAssertEqual(spec.size.width, 210.0, accuracy: 0.1)
-        XCTAssertEqual(spec.size.height, 36.0, accuracy: 0.1)
-        XCTAssertEqual(spec.cornerRadius, 18.0, accuracy: 0.1)
+        XCTAssertEqual(spec.size.height, 38.0, accuracy: 0.1)
+        XCTAssertEqual(spec.cornerRadius, 19.0, accuracy: 0.1)
     }
     
     func testBatteryCriticalAlertSize() {
