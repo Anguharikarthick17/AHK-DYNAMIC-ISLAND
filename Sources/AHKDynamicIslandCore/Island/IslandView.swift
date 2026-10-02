@@ -215,20 +215,20 @@ public final class IslandView: NSView {
         layer.masksToBounds = true
         
         // Corner radius:
-        // Collapsed capsule corner radius matches half its height or ~18pt
+        // Collapsed capsule corner radius matches half its height (38pt / 2 = 19pt)
         // Expanded rounded card has a sleek 24pt continuous corner radius
-        layer.cornerRadius = isExpanded ? 24.0 : 18.0
+        layer.cornerRadius = isExpanded ? 24.0 : 19.0
         
-        // Premium liquid glass border highlight
-        layer.borderWidth = 0.5
-        layer.borderColor = NSColor(white: 1.0, alpha: isExpanded ? 0.16 : 0.11).cgColor
+        // Premium liquid glass border highlight (visible on black and white backgrounds)
+        layer.borderWidth = 1.0
+        layer.borderColor = NSColor(white: 1.0, alpha: isExpanded ? 0.24 : 0.20).cgColor
         
         // Shadow configuration on self (or container)
         wantsLayer = true
         self.layer?.shadowColor = NSColor.black.cgColor
-        self.layer?.shadowOpacity = isExpanded ? 0.42 : 0.30
-        self.layer?.shadowRadius = isExpanded ? 18.0 : 10.0
-        self.layer?.shadowOffset = CGSize(width: 0, height: -5)
+        self.layer?.shadowOpacity = isExpanded ? 0.48 : 0.38
+        self.layer?.shadowRadius = isExpanded ? 18.0 : 12.0
+        self.layer?.shadowOffset = CGSize(width: 0, height: -4)
     }
     
     public func setContentAlpha(_ alpha: CGFloat) {

@@ -15,6 +15,12 @@ public struct ScreenGeometryInfo: Equatable, Sendable {
     /// Physical notch bounding box in global coordinates (or empty if no notch).
     public let notchRect: NSRect
     
+    /// Bottom Y coordinate of the physical notch in global coordinates.
+    public let notchBottomY: CGFloat
+    
+    /// Safe gap between the notch bottom and the island top.
+    public let gap: CGFloat
+    
     /// Safe area top inset (height of notch area).
     public let safeAreaTop: CGFloat
     
@@ -36,7 +42,7 @@ public struct ScreenGeometryInfo: Equatable, Sendable {
     /// Expanded island frame in global screen coordinates.
     public let expandedFrame: NSRect
     
-    /// Top margin inside the expanded island to clear camera/notch.
+    /// Top padding inside the expanded island.
     public let notchClearanceHeight: CGFloat
     
     public init(
@@ -44,6 +50,8 @@ public struct ScreenGeometryInfo: Equatable, Sendable {
         visibleFrame: NSRect,
         hasNotch: Bool,
         notchRect: NSRect,
+        notchBottomY: CGFloat,
+        gap: CGFloat,
         safeAreaTop: CGFloat,
         menuBarHeight: CGFloat,
         anchorPoint: NSPoint,
@@ -57,6 +65,8 @@ public struct ScreenGeometryInfo: Equatable, Sendable {
         self.visibleFrame = visibleFrame
         self.hasNotch = hasNotch
         self.notchRect = notchRect
+        self.notchBottomY = notchBottomY
+        self.gap = gap
         self.safeAreaTop = safeAreaTop
         self.menuBarHeight = menuBarHeight
         self.anchorPoint = anchorPoint
@@ -70,6 +80,9 @@ public struct ScreenGeometryInfo: Equatable, Sendable {
 
 /// Provides screen and notch geometry detection with safe fallbacks for non-notch displays.
 public final class NotchGeometryProvider: @unchecked Sendable {
+    
+    /// Default safe gap between the bottom of the physical notch and the top of the island.
+    public static let defaultGap: CGFloat = 6.0
     
     public init() {}
     
@@ -103,7 +116,6 @@ public final class NotchGeometryProvider: @unchecked Sendable {
                    right.minX > left.maxX {
                     return true
                 }
-                // Even if auxiliary areas are unavailable, a safeAreaInsets.top > 24 indicates notch area
                 return screen.safeAreaInsets.top > 24.0
             }
         }
@@ -111,7 +123,7 @@ public final class NotchGeometryProvider: @unchecked Sendable {
     }
     
     /// Computes the complete geometry info for a given NSScreen.
-    public func geometry(for screen: NSScreen) -> ScreenGeometryInfo {
+    public func geometry(for screen: NSScreen, gap: CGFloat = defaultGap) -> ScreenGeometryInfo {
         let screenFrame = screen.frame
         let visibleFrame = screen.visibleFrame
         
@@ -130,22 +142,25 @@ public final class NotchGeometryProvider: @unchecked Sendable {
             visibleFrame: visibleFrame,
             safeAreaInsetsTop: safeAreaTop,
             auxiliaryLeft: auxLeft,
-            auxiliaryRight: auxRight
+            auxiliaryRight: auxRight,
+            gap: gap
         )
     }
     
-    /// Pure calculation function suitable for testing without hardware screens.
+    /// Pure calculation function positioning the island entirely BELOW the physical notch.
     public static func calculate(
         screenFrame: NSRect,
         visibleFrame: NSRect,
         safeAreaInsetsTop: CGFloat,
         auxiliaryLeft: NSRect?,
-        auxiliaryRight: NSRect?
+        auxiliaryRight: NSRect?,
+        gap: CGFloat = defaultGap
     ) -> ScreenGeometryInfo {
         let menuBarHeight = max(24.0, screenFrame.maxY - visibleFrame.maxY)
         
         var hasNotch = false
         var notchRect = NSRect.zero
+        let notchBottomY: CGFloat
         
         if safeAreaInsetsTop > 0,
            let left = auxiliaryLeft,
@@ -157,6 +172,7 @@ public final class NotchGeometryProvider: @unchecked Sendable {
             let notchX = left.maxX
             let notchY = screenFrame.maxY - notchHeight
             notchRect = NSRect(x: notchX, y: notchY, width: notchWidth, height: notchHeight)
+            notchBottomY = notchY
         } else if safeAreaInsetsTop > 24.0 {
             // Safe fallback if auxiliary areas missing on notch display
             hasNotch = true
@@ -164,85 +180,55 @@ public final class NotchGeometryProvider: @unchecked Sendable {
             let notchX = screenFrame.midX - (estimatedWidth / 2.0)
             let notchY = screenFrame.maxY - safeAreaInsetsTop
             notchRect = NSRect(x: notchX, y: notchY, width: estimatedWidth, height: safeAreaInsetsTop)
+            notchBottomY = notchY
+        } else {
+            hasNotch = false
+            notchBottomY = screenFrame.maxY
         }
         
         let anchorX = hasNotch ? notchRect.midX : screenFrame.midX
         
-        let collapsedSize: CGSize
-        let expandedSize: CGSize
-        let collapsedFrame: NSRect
-        let expandedFrame: NSRect
-        let notchClearanceHeight: CGFloat
-        let anchorY: CGFloat
+        // Critical: Island top must sit BELOW the physical notch / camera region.
+        let rawTopY = hasNotch ? (notchBottomY - gap) : min(screenFrame.maxY - gap, visibleFrame.maxY - gap)
+        let islandTopY = rawTopY.rounded(.down)
         
-        if hasNotch {
-            // Anchor flush with the top bezel
-            anchorY = screenFrame.maxY
-            notchClearanceHeight = notchRect.height
-            
-            // Collapsed wraps Users snugly around notch with comfortable corner radii
-            let cWidth = (max(notchRect.width + 16.0, 224.0)).rounded(.up)
-            let cHeight = (notchRect.height + 4.0).rounded(.up)
-            collapsedSize = CGSize(width: cWidth, height: cHeight)
-            
-            // Expanded width and height
-            let eWidth = max(notchRect.width + 160.0, 380.0)
-            let eHeight: CGFloat = 160.0
-            expandedSize = CGSize(width: eWidth, height: eHeight)
-            
-            collapsedFrame = NSRect(
-                x: anchorX - (cWidth / 2.0),
-                y: anchorY - cHeight,
-                width: cWidth,
-                height: cHeight
-            )
-            
-            expandedFrame = NSRect(
-                x: anchorX - (eWidth / 2.0),
-                y: anchorY - eHeight,
-                width: eWidth,
-                height: eHeight
-            )
-        } else {
-            // Non-notch fallback:
-            // Position just below the menu bar with a subtle 4pt gap,
-            // or if menu bar is auto-hidden (visibleFrame.maxY == screenFrame.maxY),
-            // position 6pt below the top edge.
-            let topMargin: CGFloat = 4.0
-            anchorY = min(screenFrame.maxY - 6.0, visibleFrame.maxY - topMargin)
-            notchClearanceHeight = 8.0
-            
-            let cWidth: CGFloat = 180.0
-            let cHeight: CGFloat = 34.0
-            collapsedSize = CGSize(width: cWidth, height: cHeight)
-            
-            let eWidth: CGFloat = 360.0
-            let eHeight: CGFloat = 140.0
-            expandedSize = CGSize(width: eWidth, height: eHeight)
-            
-            collapsedFrame = NSRect(
-                x: anchorX - (cWidth / 2.0),
-                y: anchorY - cHeight,
-                width: cWidth,
-                height: cHeight
-            )
-            
-            expandedFrame = NSRect(
-                x: anchorX - (eWidth / 2.0),
-                y: anchorY - eHeight,
-                width: eWidth,
-                height: eHeight
-            )
-        }
+        // Collapsed state: Compact capsule (200x38 pt)
+        let cWidth: CGFloat = 200.0
+        let cHeight: CGFloat = 38.0
+        let collapsedSize = CGSize(width: cWidth, height: cHeight)
+        
+        // Expanded state: Rounded card (380x160 pt)
+        let eWidth: CGFloat = 380.0
+        let eHeight: CGFloat = 160.0
+        let expandedSize = CGSize(width: eWidth, height: eHeight)
+        
+        // Top edge remains pinned at islandTopY, expanding downward
+        let collapsedFrame = NSRect(
+            x: anchorX - (cWidth / 2.0),
+            y: islandTopY - cHeight,
+            width: cWidth,
+            height: cHeight
+        )
+        
+        let expandedFrame = NSRect(
+            x: anchorX - (eWidth / 2.0),
+            y: islandTopY - eHeight,
+            width: eWidth,
+            height: eHeight
+        )
+        
+        let notchClearanceHeight: CGFloat = 8.0
         
         return ScreenGeometryInfo(
             screenFrame: screenFrame,
             visibleFrame: visibleFrame,
             hasNotch: hasNotch,
             notchRect: notchRect,
+            notchBottomY: notchBottomY,
+            gap: gap,
             safeAreaTop: safeAreaInsetsTop,
             menuBarHeight: menuBarHeight,
-            anchorPoint: NSPoint(x: anchorX, y: anchorY),
+            anchorPoint: NSPoint(x: anchorX, y: islandTopY),
             collapsedSize: collapsedSize,
             expandedSize: expandedSize,
             collapsedFrame: collapsedFrame,

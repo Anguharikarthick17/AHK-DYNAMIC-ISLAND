@@ -208,9 +208,6 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
     }
     
     public func islandWindowDidResignKey(_ window: IslandWindow) {
-        // Optional collapse on focus loss if currently expanded
-        if stateManager.currentState == .expanded {
-            collapse(animated: true)
-        }
+        // Keep expanded until user explicitly clicks the island or presses Escape
     }
 }

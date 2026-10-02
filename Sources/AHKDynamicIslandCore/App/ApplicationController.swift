@@ -34,6 +34,37 @@ public final class ApplicationController: NSObject, MenuBarControllerDelegate {
         islandWindowController.onVisibilityChanged = { [weak self] isVisible in
             self?.menuBarController.updateVisibilityState(isVisible: isVisible)
         }
+        
+        // Distributed notifications for CLI / test automation / shortcuts
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.ahk.dynamicisland.toggleExpand"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.islandWindowController.toggleExpandCollapse()
+            }
+        }
+        
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.ahk.dynamicisland.expand"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.islandWindowController.expand()
+            }
+        }
+        
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.ahk.dynamicisland.collapse"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.islandWindowController.collapse()
+            }
+        }
     }
     
     /// Starts the application, showing the island in its initial collapsed state.

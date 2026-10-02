@@ -10,32 +10,49 @@ final class NotchGeometryTests: XCTestCase {
         let safeAreaTop: CGFloat = 37.5
         let auxLeft = NSRect(x: 0, y: 1074.5, width: 751, height: 37.5)
         let auxRight = NSRect(x: 959, y: 1074.5, width: 751, height: 37.5)
+        let gap: CGFloat = 6.0
         
         let info = NotchGeometryProvider.calculate(
             screenFrame: screenFrame,
             visibleFrame: visibleFrame,
             safeAreaInsetsTop: safeAreaTop,
             auxiliaryLeft: auxLeft,
-            auxiliaryRight: auxRight
+            auxiliaryRight: auxRight,
+            gap: gap
         )
         
         XCTAssertTrue(info.hasNotch, "Should detect hardware notch")
         XCTAssertEqual(info.notchRect.width, 208, accuracy: 0.1, "Notch width should be 208 pt")
         XCTAssertEqual(info.notchRect.height, 37.5, accuracy: 0.1, "Notch height should match safeAreaTop")
         XCTAssertEqual(info.notchRect.origin.x, 751, accuracy: 0.1, "Notch X should start at auxLeft.maxX")
-        XCTAssertEqual(info.notchRect.origin.y, 1112 - 37.5, accuracy: 0.1, "Notch Y should sit at top")
-        XCTAssertEqual(info.anchorPoint.x, 855, accuracy: 0.1, "Anchor X should be midX of notch (855)")
-        XCTAssertEqual(info.anchorPoint.y, 1112, accuracy: 0.1, "Anchor Y should be top of screen")
+        XCTAssertEqual(info.notchRect.origin.y, 1112 - 37.5, accuracy: 0.1, "Notch Y should sit at 1074.5")
         
-        // Collapsed bounds
-        XCTAssertGreaterThanOrEqual(info.collapsedSize.width, 224, "Collapsed width should accommodate notch")
-        XCTAssertEqual(info.collapsedSize.height, 42.0, accuracy: 0.1, "Collapsed height should cover notch + padding")
-        XCTAssertEqual(info.collapsedFrame.maxY, 1112, accuracy: 0.1, "Collapsed island top should be flush with screen top")
+        // Notch bottom edge calculation
+        XCTAssertEqual(info.notchBottomY, 1074.5, accuracy: 0.1, "Notch bottom Y must be 1074.5 pt")
+        XCTAssertEqual(info.gap, 6.0, accuracy: 0.1, "Gap between notch and island must be 6 pt")
         
-        // Expanded bounds
-        XCTAssertGreaterThanOrEqual(info.expandedSize.width, 380, "Expanded width should be at least 380 pt")
-        XCTAssertEqual(info.expandedSize.height, 160, accuracy: 0.1, "Expanded height should be 160 pt")
-        XCTAssertEqual(info.expandedFrame.maxY, 1112, accuracy: 0.1, "Expanded island top should be flush with screen top")
+        // Anchor point: Centered horizontally at notch midX, top at notchBottomY - gap (rounded down to integer point)
+        let expectedIslandTopY: CGFloat = (1074.5 - 6.0).rounded(.down) // 1068.0 pt
+        XCTAssertEqual(info.anchorPoint.x, 855.0, accuracy: 0.1, "Anchor X should be midX of notch (855)")
+        XCTAssertEqual(info.anchorPoint.y, expectedIslandTopY, accuracy: 0.1, "Anchor Y must be directly below notch")
+        
+        // CRITICAL: Island top edge must be strictly below notch bottom edge
+        
+        // Collapsed bounds (200 x 38 pt)
+        XCTAssertEqual(info.collapsedSize.width, 200.0, accuracy: 0.1)
+        XCTAssertEqual(info.collapsedSize.height, 38.0, accuracy: 0.1)
+        XCTAssertEqual(info.collapsedFrame.maxY, expectedIslandTopY, accuracy: 0.1, "Collapsed island top must be 6pt below notch")
+        XCTAssertLessThan(info.collapsedFrame.maxY, info.notchBottomY, "Collapsed island must be completely below notch")
+        
+        // Expanded bounds (380 x 160 pt)
+        XCTAssertEqual(info.expandedSize.width, 380.0, accuracy: 0.1)
+        XCTAssertEqual(info.expandedSize.height, 160.0, accuracy: 0.1)
+        XCTAssertEqual(info.expandedFrame.maxY, expectedIslandTopY, accuracy: 0.1, "Expanded island top must stay 6pt below notch")
+        XCTAssertLessThan(info.expandedFrame.maxY, info.notchBottomY, "Expanded island must never expand behind the notch")
+        
+        // Expansion is downward only
+        XCTAssertEqual(info.expandedFrame.minY, expectedIslandTopY - 160.0, accuracy: 0.1)
+        XCTAssertLessThan(info.expandedFrame.minY, info.collapsedFrame.minY, "Expanded island grows downward")
     }
     
     func testNotchDetectionWithoutAuxiliaryAreasFallback() {
@@ -54,6 +71,7 @@ final class NotchGeometryTests: XCTestCase {
         
         XCTAssertTrue(info.hasNotch, "Should detect notch from safeAreaTop > 24 pt")
         XCTAssertEqual(info.notchRect.height, 38.0, accuracy: 0.1)
-        XCTAssertEqual(info.anchorPoint.x, screenFrame.midX, accuracy: 0.1)
+        XCTAssertEqual(info.notchBottomY, 1112 - 38.0, accuracy: 0.1)
+        XCTAssertLessThan(info.collapsedFrame.maxY, info.notchBottomY)
     }
 }
