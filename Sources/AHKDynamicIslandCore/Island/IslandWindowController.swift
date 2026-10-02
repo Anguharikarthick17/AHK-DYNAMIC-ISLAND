@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Coordinates the lifecycle, geometry, state, and animation of the Dynamic Island window.
+/// Coordinates the lifecycle, geometry, activity state, and dynamic animations of the Dynamic Island window.
 @MainActor
 public final class IslandWindowController: NSObject, IslandViewDelegate, IslandWindowDelegate {
     
@@ -11,29 +11,38 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
     public let stateManager: IslandStateManager
     public let animator: IslandAnimator
     public let displayObserver: DisplayObserver
+    public let layoutEngine: IslandLayoutEngine
     
     public private(set) var currentGeometry: ScreenGeometryInfo
     
     public var onStateChanged: ((IslandDisplayState) -> Void)?
+    public var onActivityChanged: ((IslandActivity) -> Void)?
     public var onVisibilityChanged: ((Bool) -> Void)?
     
     public init(
         geometryProvider: NotchGeometryProvider = NotchGeometryProvider(),
-        stateManager: IslandStateManager = IslandStateManager()
+        stateManager: IslandStateManager = IslandStateManager(),
+        layoutEngine: IslandLayoutEngine = IslandLayoutEngine.shared
     ) {
         self.geometryProvider = geometryProvider
         self.stateManager = stateManager
+        self.layoutEngine = layoutEngine
         self.animator = IslandAnimator()
         self.displayObserver = DisplayObserver()
         
-        // Initial screen geometry calculation
         let screen = geometryProvider.targetScreen() ?? NSScreen.main ?? NSScreen.screens[0]
         let initialGeometry = geometryProvider.geometry(for: screen)
         self.currentGeometry = initialGeometry
         
-        // Initialize window at collapsed frame
-        self.window = IslandWindow(contentRect: initialGeometry.collapsedFrame)
-        self.islandView = IslandView(frame: NSRect(origin: .zero, size: initialGeometry.collapsedFrame.size))
+        // Initial layout spec for idle capsule (150x26)
+        let initialSpec = layoutEngine.layoutSpec(
+            for: .idle,
+            isExpanded: false,
+            screenGeometry: initialGeometry
+        )
+        
+        self.window = IslandWindow(contentRect: initialSpec.frame)
+        self.islandView = IslandView(frame: NSRect(origin: .zero, size: initialSpec.frame.size))
         
         super.init()
         
@@ -45,19 +54,22 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
         islandView.delegate = self
         window.interactionDelegate = self
         
-        islandView.updateGeometry(info: currentGeometry)
-        islandView.applyContainerStyle(isExpanded: false)
-        islandView.setContentAlpha(0.0)
+        islandView.applyLayout(
+            size: currentGeometry.collapsedSize,
+            cornerRadius: IslandSizeTier.idle.cornerRadius
+        )
         
-        // State forwarding
+        // Forward state notifications
         stateManager.onStateChanged = { [weak self] state in
             self?.onStateChanged?(state)
+        }
+        stateManager.onActivityChanged = { [weak self] activity in
+            self?.onActivityChanged?(activity)
         }
         stateManager.onVisibilityChanged = { [weak self] isVisible in
             self?.onVisibilityChanged?(isVisible)
         }
         
-        // Display observer setup
         displayObserver.startObserving { [weak self] in
             self?.handleDisplayConfigurationChanged()
         }
@@ -70,20 +82,17 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
         let newGeometry = geometryProvider.geometry(for: screen)
         self.currentGeometry = newGeometry
         
-        islandView.updateGeometry(info: newGeometry)
+        let isExpanded = stateManager.currentState.isExpandedOrExpanding
+        let targetSpec = layoutEngine.layoutSpec(
+            for: stateManager.currentActivity,
+            isExpanded: isExpanded,
+            screenGeometry: newGeometry
+        )
         
-        let targetFrame: NSRect
-        switch stateManager.currentState {
-        case .expanded, .expanding:
-            targetFrame = newGeometry.expandedFrame
-        case .collapsed, .collapsing:
-            targetFrame = newGeometry.collapsedFrame
-        }
-        
-        // Update frame without recreating the window
-        animator.setImmediately(window: window, targetFrame: targetFrame) { [weak self] in
+        animator.setImmediately(window: window, targetFrame: targetSpec.frame) { [weak self] in
             guard let self = self else { return }
-            self.islandView.frame = NSRect(origin: .zero, size: targetFrame.size)
+            self.islandView.frame = NSRect(origin: .zero, size: targetSpec.frame.size)
+            self.islandView.applyLayout(size: targetSpec.size, cornerRadius: targetSpec.cornerRadius)
         }
     }
     
@@ -107,88 +116,62 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
         }
     }
     
+    // MARK: - Activity Presentation
+    
+    public func presentActivity(_ activity: IslandActivity, isExpanded: Bool = false, animated: Bool = true) {
+        stateManager.setActivity(activity)
+        let spec = layoutEngine.layoutSpec(for: activity, isExpanded: isExpanded, screenGeometry: currentGeometry)
+        
+        window.allowsKeyStatus = isExpanded
+        islandView.present(activity: activity, isExpanded: isExpanded)
+        
+        if animated {
+            let transitionState: IslandDisplayState = isExpanded ? .expanding : .collapsing
+            stateManager.transition(to: transitionState)
+            
+            animator.animate(
+                window: window,
+                targetFrame: spec.frame,
+                parameters: isExpanded ? .defaultSpring : .quickCollapse,
+                viewAnimations: { [weak self] in
+                    guard let self = self else { return }
+                    self.islandView.frame = NSRect(origin: .zero, size: spec.frame.size)
+                    self.islandView.applyLayout(size: spec.size, cornerRadius: spec.cornerRadius)
+                },
+                completion: { [weak self] completed in
+                    guard let self = self, completed else { return }
+                    self.stateManager.transition(to: isExpanded ? .expanded : .collapsed)
+                    if isExpanded {
+                        self.window.makeKey()
+                    }
+                }
+            )
+        } else {
+            animator.setImmediately(window: window, targetFrame: spec.frame) { [weak self] in
+                guard let self = self else { return }
+                self.islandView.frame = NSRect(origin: .zero, size: spec.frame.size)
+                self.islandView.applyLayout(size: spec.size, cornerRadius: spec.cornerRadius)
+            }
+            stateManager.transition(to: isExpanded ? .expanded : .collapsed)
+            if isExpanded {
+                window.makeKey()
+            }
+        }
+    }
+    
     // MARK: - Expand / Collapse Actions
     
     public func expand(animated: Bool = true) {
-        guard stateManager.transition(to: .expanding) else { return }
-        
-        let targetFrame = currentGeometry.expandedFrame
-        window.allowsKeyStatus = true
-        
-        if animated {
-            animator.animate(
-                window: window,
-                targetFrame: targetFrame,
-                parameters: .defaultSpring,
-                viewAnimations: { [weak self] in
-                    guard let self = self else { return }
-                    self.islandView.frame = NSRect(origin: .zero, size: targetFrame.size)
-                    self.islandView.applyContainerStyle(isExpanded: true)
-                    self.islandView.setContentAlpha(1.0)
-                },
-                completion: { [weak self] completed in
-                    guard let self = self, completed else { return }
-                    self.stateManager.transition(to: .expanded)
-                    self.window.makeKey()
-                }
-            )
-        } else {
-            animator.setImmediately(window: window, targetFrame: targetFrame) { [weak self] in
-                guard let self = self else { return }
-                self.islandView.frame = NSRect(origin: .zero, size: targetFrame.size)
-                self.islandView.applyContainerStyle(isExpanded: true)
-                self.islandView.setContentAlpha(1.0)
-            }
-            stateManager.transition(to: .expanded)
-            window.makeKey()
-        }
+        presentActivity(stateManager.currentActivity, isExpanded: true, animated: animated)
     }
     
     public func collapse(animated: Bool = true) {
-        guard stateManager.transition(to: .collapsing) else { return }
-        
-        let targetFrame = currentGeometry.collapsedFrame
-        
-        // Resign key status immediately so keyboard returns to previous app
-        window.allowsKeyStatus = false
-        window.resignKey()
-        
-        if animated {
-            animator.animate(
-                window: window,
-                targetFrame: targetFrame,
-                parameters: .quickCollapse,
-                viewAnimations: { [weak self] in
-                    guard let self = self else { return }
-                    self.islandView.frame = NSRect(origin: .zero, size: targetFrame.size)
-                    self.islandView.applyContainerStyle(isExpanded: false)
-                    self.islandView.setContentAlpha(0.0)
-                },
-                completion: { [weak self] completed in
-                    guard let self = self, completed else { return }
-                    self.stateManager.transition(to: .collapsed)
-                }
-            )
-        } else {
-            animator.setImmediately(window: window, targetFrame: targetFrame) { [weak self] in
-                guard let self = self else { return }
-                self.islandView.frame = NSRect(origin: .zero, size: targetFrame.size)
-                self.islandView.applyContainerStyle(isExpanded: false)
-                self.islandView.setContentAlpha(0.0)
-            }
-            stateManager.transition(to: .collapsed)
-        }
+        presentActivity(stateManager.currentActivity, isExpanded: false, animated: animated)
     }
     
     public func toggleExpandCollapse(animated: Bool = true) {
-        switch stateManager.toggledTargetState {
-        case .expanded:
-            expand(animated: animated)
-        case .collapsed:
-            collapse(animated: animated)
-        default:
-            break
-        }
+        let targetExpanded = !stateManager.currentState.isExpandedOrExpanding
+        presentActivity(stateManager.currentActivity, isExpanded: targetExpanded, animated: animated)
     }
     
     // MARK: - IslandViewDelegate
@@ -197,8 +180,8 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
         toggleExpandCollapse(animated: true)
     }
     
-    public func islandViewDidRequestCollapse(_ view: IslandView) {
-        collapse(animated: true)
+    public func islandViewDidRequestDismissActivity(_ view: IslandView) {
+        presentActivity(.idle, isExpanded: false, animated: true)
     }
     
     // MARK: - IslandWindowDelegate

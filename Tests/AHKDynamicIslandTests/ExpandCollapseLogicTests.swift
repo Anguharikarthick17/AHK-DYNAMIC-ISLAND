@@ -18,14 +18,14 @@ final class ExpandCollapseLogicTests: XCTestCase {
         XCTAssertEqual(controller.stateManager.currentState, .expanded)
         XCTAssertEqual(controller.window.frame.size, controller.currentGeometry.expandedSize)
         XCTAssertTrue(controller.window.allowsKeyStatus)
-        XCTAssertEqual(controller.islandView.expandedContentView.alphaValue, 1.0)
+        XCTAssertTrue(controller.islandView.isExpanded)
         
         // Non-animated immediate collapse
         controller.collapse(animated: false)
         XCTAssertEqual(controller.stateManager.currentState, .collapsed)
         XCTAssertEqual(controller.window.frame.size, controller.currentGeometry.collapsedSize)
         XCTAssertFalse(controller.window.allowsKeyStatus)
-        XCTAssertEqual(controller.islandView.expandedContentView.alphaValue, 0.0)
+        XCTAssertFalse(controller.islandView.isExpanded)
     }
     
     func testToggleExpandCollapse() {

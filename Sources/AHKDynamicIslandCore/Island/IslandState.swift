@@ -1,48 +1,128 @@
 import Foundation
 
-/// Represents the display state of the dynamic island.
+/// Priority tiers for dynamic island activities.
+public enum ActivityPriority: Int, Comparable, Sendable {
+    case idle = 0
+    case volume = 10
+    case brightness = 15
+    case nowPlaying = 20
+    case battery = 25
+    case fileTransfer = 30
+    case download = 40
+    case criticalAlert = 50
+    
+    public static func < (lhs: ActivityPriority, rhs: ActivityPriority) -> Bool {
+        return lhs.rawValue < rhs.rawValue
+    }
+}
+
+/// The active content/activity payload currently presented by the dynamic island.
+public enum IslandActivity: Equatable, Sendable {
+    case idle
+    case volume(level: Float, isMuted: Bool)
+    case brightness(level: Float)
+    case battery(level: Float, isCharging: Bool, isLow: Bool, isCritical: Bool)
+    case nowPlaying(state: NowPlayingState)
+    case download(state: DownloadState)
+    case fileTransfer(state: FileTransferState)
+    case notification(title: String, subtitle: String?, iconName: String?)
+    
+    /// Priority of this activity.
+    public var priority: ActivityPriority {
+        switch self {
+        case .idle:
+            return .idle
+        case .volume:
+            return .volume
+        case .brightness:
+            return .brightness
+        case .battery(_, _, _, let isCritical):
+            return isCritical ? .criticalAlert : .battery
+        case .nowPlaying:
+            return .nowPlaying
+        case .fileTransfer:
+            return .fileTransfer
+        case .download:
+            return .download
+        case .notification:
+            return .fileTransfer
+        }
+    }
+    
+    /// Default display duration before auto-collapsing to idle.
+    public var autoDismissInterval: TimeInterval? {
+        switch self {
+        case .idle:
+            return nil
+        case .volume, .brightness:
+            return 1.8
+        case .battery(_, _, _, let isCritical):
+            return isCritical ? nil : 3.0
+        case .nowPlaying:
+            return nil // Remains active while playing
+        case .download(let state):
+            return state.isCompleted ? 2.0 : nil
+        case .fileTransfer(let state):
+            return state.isCompleted ? 2.0 : nil
+        case .notification:
+            return 3.5
+        }
+    }
+}
+
+/// Represents the presentation state of the dynamic island.
 public enum IslandDisplayState: String, Equatable, Sendable {
     case collapsed
     case expanding
     case expanded
     case collapsing
     
-    /// Whether the island is fully expanded or currently expanding.
     public var isExpandedOrExpanding: Bool {
         return self == .expanded || self == .expanding
     }
     
-    /// Whether the island is fully collapsed or currently collapsing.
     public var isCollapsedOrCollapsing: Bool {
         return self == .collapsed || self == .collapsing
     }
     
-    /// Whether an expansion can be initiated.
     public var canExpand: Bool {
         return self == .collapsed || self == .collapsing
     }
     
-    /// Whether a collapse can be initiated.
     public var canCollapse: Bool {
         return self == .expanded || self == .expanding
     }
 }
 
-/// Manages and validates island state transitions.
+/// Manages dynamic island state and active activities.
 public final class IslandStateManager: @unchecked Sendable {
     
     public private(set) var currentState: IslandDisplayState
+    public private(set) var currentActivity: IslandActivity
     public private(set) var isVisible: Bool
     
     public var onStateChanged: ((IslandDisplayState) -> Void)?
+    public var onActivityChanged: ((IslandActivity) -> Void)?
     public var onVisibilityChanged: ((Bool) -> Void)?
     
-    public init(initialState: IslandDisplayState = .collapsed, isVisible: Bool = true) {
+    public init(
+        initialState: IslandDisplayState = .collapsed,
+        initialActivity: IslandActivity = .idle,
+        isVisible: Bool = true
+    ) {
         self.currentState = initialState
+        self.currentActivity = initialActivity
         self.isVisible = isVisible
     }
     
-    /// Transitions to a target state if valid.
+    /// Updates the active activity.
+    public func setActivity(_ activity: IslandActivity) {
+        guard activity != currentActivity else { return }
+        self.currentActivity = activity
+        onActivityChanged?(activity)
+    }
+    
+    /// Transitions display state if valid.
     @discardableResult
     public func transition(to newState: IslandDisplayState) -> Bool {
         guard newState != currentState else { return true }
@@ -50,22 +130,12 @@ public final class IslandStateManager: @unchecked Sendable {
         switch (currentState, newState) {
         case (.collapsed, .expanding),
              (.expanding, .expanded),
-             (.expanding, .collapsing), // Interruption
+             (.expanding, .collapsing),
              (.expanded, .collapsing),
              (.collapsing, .collapsed),
-             (.collapsing, .expanding): // Interruption
-            currentState = newState
-            onStateChanged?(newState)
-            return true
-            
-        case (.collapsed, .expanded):
-            // Direct jump (e.g. non-animated)
-            currentState = newState
-            onStateChanged?(newState)
-            return true
-            
-        case (.expanded, .collapsed):
-            // Direct jump (e.g. non-animated)
+             (.collapsing, .expanding),
+             (.collapsed, .expanded),
+             (.expanded, .collapsed):
             currentState = newState
             onStateChanged?(newState)
             return true
@@ -75,7 +145,6 @@ public final class IslandStateManager: @unchecked Sendable {
         }
     }
     
-    /// Returns the target state when toggling expand/collapse.
     public var toggledTargetState: IslandDisplayState {
         switch currentState {
         case .collapsed, .collapsing:
@@ -85,14 +154,12 @@ public final class IslandStateManager: @unchecked Sendable {
         }
     }
     
-    /// Sets visibility of the island window.
     public func setVisibility(_ visible: Bool) {
         guard visible != isVisible else { return }
         isVisible = visible
         onVisibilityChanged?(visible)
     }
     
-    /// Toggles visibility.
     public func toggleVisibility() {
         setVisibility(!isVisible)
     }

@@ -38,20 +38,20 @@ final class NotchGeometryTests: XCTestCase {
         
         // CRITICAL: Island top edge must be strictly below notch bottom edge
         
-        // Collapsed bounds (200 x 38 pt)
-        XCTAssertEqual(info.collapsedSize.width, 200.0, accuracy: 0.1)
-        XCTAssertEqual(info.collapsedSize.height, 38.0, accuracy: 0.1)
+        // Collapsed bounds (150 x 26 pt)
+        XCTAssertEqual(info.collapsedSize.width, 150.0, accuracy: 0.1)
+        XCTAssertEqual(info.collapsedSize.height, 26.0, accuracy: 0.1)
         XCTAssertEqual(info.collapsedFrame.maxY, expectedIslandTopY, accuracy: 0.1, "Collapsed island top must be 6pt below notch")
         XCTAssertLessThan(info.collapsedFrame.maxY, info.notchBottomY, "Collapsed island must be completely below notch")
         
-        // Expanded bounds (380 x 160 pt)
-        XCTAssertEqual(info.expandedSize.width, 380.0, accuracy: 0.1)
-        XCTAssertEqual(info.expandedSize.height, 160.0, accuracy: 0.1)
+        // Expanded bounds (340 x 90 pt)
+        XCTAssertEqual(info.expandedSize.width, 340.0, accuracy: 0.1)
+        XCTAssertEqual(info.expandedSize.height, 90.0, accuracy: 0.1)
         XCTAssertEqual(info.expandedFrame.maxY, expectedIslandTopY, accuracy: 0.1, "Expanded island top must stay 6pt below notch")
         XCTAssertLessThan(info.expandedFrame.maxY, info.notchBottomY, "Expanded island must never expand behind the notch")
         
         // Expansion is downward only
-        XCTAssertEqual(info.expandedFrame.minY, expectedIslandTopY - 160.0, accuracy: 0.1)
+        XCTAssertEqual(info.expandedFrame.minY, expectedIslandTopY - 90.0, accuracy: 0.1)
         XCTAssertLessThan(info.expandedFrame.minY, info.collapsedFrame.minY, "Expanded island grows downward")
     }
     

@@ -192,14 +192,14 @@ public final class NotchGeometryProvider: @unchecked Sendable {
         let rawTopY = hasNotch ? (notchBottomY - gap) : min(screenFrame.maxY - gap, visibleFrame.maxY - gap)
         let islandTopY = rawTopY.rounded(.down)
         
-        // Collapsed state: Compact capsule (200x38 pt)
-        let cWidth: CGFloat = 200.0
-        let cHeight: CGFloat = 38.0
+        // Collapsed state: Compact idle capsule (150x26 pt)
+        let cWidth: CGFloat = 150.0
+        let cHeight: CGFloat = 26.0
         let collapsedSize = CGSize(width: cWidth, height: cHeight)
         
-        // Expanded state: Rounded card (380x160 pt)
-        let eWidth: CGFloat = 380.0
-        let eHeight: CGFloat = 160.0
+        // Expanded state: Rounded activity card (340x90 pt)
+        let eWidth: CGFloat = 340.0
+        let eHeight: CGFloat = 90.0
         let expandedSize = CGSize(width: eWidth, height: eHeight)
         
         // Top edge remains pinned at islandTopY, expanding downward

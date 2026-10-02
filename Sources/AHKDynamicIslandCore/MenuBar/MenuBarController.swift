@@ -7,6 +7,7 @@ public protocol MenuBarControllerDelegate: AnyObject {
     func menuBarDidRequestToggleVisibility()
     func menuBarDidRequestToggleExpandCollapse()
     func menuBarDidRequestSettings()
+    func menuBarDidRequestAbout()
     func menuBarDidRequestQuit()
 }
 
@@ -21,9 +22,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     
     // Dynamic menu items
     private let headerItem = NSMenuItem()
+    private let onStateItem = NSMenuItem()
     private let visibilityItem = NSMenuItem()
-    private let expandCollapseItem = NSMenuItem()
+    private let activityHeaderItem = NSMenuItem()
+    private let activityStatusItem = NSMenuItem()
     private let settingsItem = NSMenuItem()
+    private let aboutItem = NSMenuItem()
     private let quitItem = NSMenuItem()
     
     public override init() {
@@ -55,6 +59,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
+        // On status
+        onStateItem.title = "Dynamic Island: On ✓"
+        onStateItem.isEnabled = false
+        menu.addItem(onStateItem)
+        
         // Visibility toggle
         visibilityItem.title = "Hide Island"
         visibilityItem.target = self
@@ -62,19 +71,34 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         visibilityItem.isEnabled = true
         menu.addItem(visibilityItem)
         
-        // Expand/Collapse test toggle
-        expandCollapseItem.title = "Expand Island"
-        expandCollapseItem.target = self
-        expandCollapseItem.action = #selector(handleExpandCollapseClicked)
-        expandCollapseItem.isEnabled = true
-        menu.addItem(expandCollapseItem)
+        menu.addItem(NSMenuItem.separator())
         
-        // Settings (placeholder for V0.1)
+        // Current Activity section
+        activityHeaderItem.title = "Current Activity"
+        activityHeaderItem.isEnabled = false
+        menu.addItem(activityHeaderItem)
+        
+        activityStatusItem.title = "Nothing active"
+        activityStatusItem.target = self
+        activityStatusItem.action = #selector(handleExpandCollapseClicked)
+        activityStatusItem.isEnabled = true
+        menu.addItem(activityStatusItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Settings
         settingsItem.title = "Settings…"
         settingsItem.target = self
         settingsItem.action = #selector(handleSettingsClicked)
         settingsItem.isEnabled = true
         menu.addItem(settingsItem)
+        
+        // About
+        aboutItem.title = "About AHK Dynamic Island"
+        aboutItem.target = self
+        aboutItem.action = #selector(handleAboutClicked)
+        aboutItem.isEnabled = true
+        menu.addItem(aboutItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -90,10 +114,32 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     
     public func updateVisibilityState(isVisible: Bool) {
         visibilityItem.title = isVisible ? "Hide Island" : "Show Island"
+        onStateItem.title = isVisible ? "Dynamic Island: On ✓" : "Dynamic Island: Off"
+    }
+    
+    public func updateActivity(_ activity: IslandActivity) {
+        switch activity {
+        case .idle:
+            activityStatusItem.title = "Nothing active"
+        case .volume(let level, let isMuted):
+            activityStatusItem.title = isMuted ? "Volume: Muted" : "Volume: \(Int(level * 100))%"
+        case .brightness(let level):
+            activityStatusItem.title = "Brightness: \(Int(level * 100))%"
+        case .battery(let level, let isCharging, _, _):
+            activityStatusItem.title = isCharging ? "Battery: ⚡ \(Int(level * 100))%" : "Battery: 🔋 \(Int(level * 100))%"
+        case .nowPlaying(let state):
+            activityStatusItem.title = "Music: \(state.title)"
+        case .download(let state):
+            activityStatusItem.title = state.isCompleted ? "Download: Complete" : "Download: \(state.filename) (\(state.formattedProgress))"
+        case .fileTransfer(let state):
+            activityStatusItem.title = state.isCompleted ? "Transfer: Complete" : "Transfer: \(state.filename)"
+        case .notification(let title, _, _):
+            activityStatusItem.title = "Alert: \(title)"
+        }
     }
     
     public func updateExpandCollapseState(isExpanded: Bool) {
-        expandCollapseItem.title = isExpanded ? "Collapse Island" : "Expand Island"
+        // Active item title remains descriptive
     }
     
     // MARK: - Actions
@@ -108,6 +154,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     
     @objc private func handleSettingsClicked() {
         delegate?.menuBarDidRequestSettings()
+    }
+    
+    @objc private func handleAboutClicked() {
+        delegate?.menuBarDidRequestAbout()
     }
     
     @objc private func handleQuitClicked() {

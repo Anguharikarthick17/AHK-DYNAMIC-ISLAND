@@ -27,10 +27,10 @@ final class NonNotchFallbackTests: XCTestCase {
         XCTAssertLessThanOrEqual(info.expandedFrame.maxY, visibleFrame.maxY, "Expanded island must not cover the menu bar")
         
         // Standardized dimensions
-        XCTAssertEqual(info.collapsedSize.width, 200.0, accuracy: 0.1)
-        XCTAssertEqual(info.collapsedSize.height, 38.0, accuracy: 0.1)
-        XCTAssertEqual(info.expandedSize.width, 380.0, accuracy: 0.1)
-        XCTAssertEqual(info.expandedSize.height, 160.0, accuracy: 0.1)
+        XCTAssertEqual(info.collapsedSize.width, 150.0, accuracy: 0.1)
+        XCTAssertEqual(info.collapsedSize.height, 26.0, accuracy: 0.1)
+        XCTAssertEqual(info.expandedSize.width, 340.0, accuracy: 0.1)
+        XCTAssertEqual(info.expandedSize.height, 90.0, accuracy: 0.1)
     }
     
     func testNonNotchDisplayWithAutoHiddenMenuBar() {
@@ -67,6 +67,6 @@ final class NonNotchFallbackTests: XCTestCase {
         )
         
         XCTAssertEqual(info.anchorPoint.x, 1710 + 1280.0, accuracy: 0.1)
-        XCTAssertEqual(info.collapsedFrame.origin.x, 1710 + 1280.0 - 100.0, accuracy: 0.1)
+        XCTAssertEqual(info.collapsedFrame.origin.x, 1710 + 1280.0 - 75.0, accuracy: 0.1)
     }
 }
