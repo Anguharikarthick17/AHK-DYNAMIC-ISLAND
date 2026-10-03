@@ -17,8 +17,10 @@ final class DynamicSizingTests: XCTestCase {
     )
     
     func testIdleStateSize() {
+        let expectedWidth = DeviceIdentityManager.shared.idleCapsuleWidth
         let spec = engine.layoutSpec(for: .idle, isExpanded: false, screenGeometry: screenGeometry)
-        XCTAssertEqual(spec.size.width, 150.0, accuracy: 0.1)
+        XCTAssertEqual(spec.size.width, expectedWidth, accuracy: 0.1)
+        XCTAssertGreaterThanOrEqual(spec.size.width, 150.0)
         XCTAssertEqual(spec.size.height, 26.0, accuracy: 0.1)
         XCTAssertEqual(spec.cornerRadius, 13.0, accuracy: 0.1, "Idle capsule corner radius should be half height")
         XCTAssertEqual(spec.tier, IslandSizeTier.idle)

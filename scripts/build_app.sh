@@ -23,12 +23,20 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$PROJECT_DIR/.build/release/AHKDynamicIsland" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
 
+if [[ -f "$PROJECT_DIR/.build/release/AHKChromeMediaHost" ]]; then
+    cp "$PROJECT_DIR/.build/release/AHKChromeMediaHost" "$MACOS_DIR/AHKChromeMediaHost"
+    chmod +x "$MACOS_DIR/AHKChromeMediaHost"
+fi
+
 # Copy Info.plist
 cp "$PROJECT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
 
 # Copy AppIcon if available
 if [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]]; then
     cp "$PROJECT_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+fi
+if [[ -f "$PROJECT_DIR/Resources/AppIcon.png" ]]; then
+    cp "$PROJECT_DIR/Resources/AppIcon.png" "$RESOURCES_DIR/AppIcon.png"
 fi
 
 # Code sign with Sandbox entitlements

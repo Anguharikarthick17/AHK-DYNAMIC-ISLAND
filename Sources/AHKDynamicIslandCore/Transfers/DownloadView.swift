@@ -4,11 +4,11 @@ import Foundation
 /// Visual presentation for download progress and completion in the dynamic island.
 public final class DownloadView: NSView {
     
-    private let iconView = NSImageView()
-    private let headerLabel = NSTextField(labelWithString: "Downloading")
-    private let filenameLabel = NSTextField(labelWithString: "")
-    private let progressBar = NSProgressIndicator()
-    private let statsLabel = NSTextField(labelWithString: "")
+    let iconView = NSImageView()
+    let headerLabel = NSTextField(labelWithString: "Downloading")
+    let filenameLabel = NSTextField(labelWithString: "")
+    let progressBar = NSProgressIndicator()
+    let statsLabel = NSTextField(labelWithString: "")
     
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -84,7 +84,11 @@ public final class DownloadView: NSView {
         if state.isCompleted {
             iconView.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Complete")
             iconView.contentTintColor = NSColor(red: 0.35, green: 0.85, blue: 0.45, alpha: 1.0)
-            headerLabel.stringValue = "Download Complete"
+            if let app = state.appName, !app.isEmpty {
+                headerLabel.stringValue = "\(app) Download Complete"
+            } else {
+                headerLabel.stringValue = "Download Complete"
+            }
             headerLabel.textColor = NSColor(red: 0.35, green: 0.85, blue: 0.45, alpha: 1.0)
             statsLabel.stringValue = "Done"
         } else {

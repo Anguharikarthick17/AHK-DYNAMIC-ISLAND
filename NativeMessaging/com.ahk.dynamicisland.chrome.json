@@ -1,0 +1,10 @@
+{
+  "name": "com.ahk.dynamicisland.chrome",
+  "description": "AHK Dynamic Island Chrome Media Bridge",
+  "path": "/Users/angu/Library/Application Support/AHKDynamicIsland/AHKChromeMediaHost",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://lijlklgicnimjeejfbbijfabmoagfpfe/",
+    "chrome-extension://lijlklgicnimjeejfbbijfabmoagfpfe/*"
+  ]
+}

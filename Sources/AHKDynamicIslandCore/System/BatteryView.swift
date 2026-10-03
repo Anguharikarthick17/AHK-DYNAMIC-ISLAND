@@ -51,11 +51,23 @@ public final class BatteryView: NSView {
         ])
     }
     
-    public func update(level: Float, isCharging: Bool, isLow: Bool, isCritical: Bool) {
+    public func update(
+        level: Float,
+        isCharging: Bool,
+        isLow: Bool,
+        isCritical: Bool,
+        timeRemaining: String? = nil,
+        isFullyCharged: Bool = false
+    ) {
         let percent = Int(level * 100)
         percentageLabel.stringValue = "\(percent)%"
         
-        if isCritical {
+        if isFullyCharged {
+            iconView.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Fully Charged")
+            iconView.contentTintColor = NSColor(red: 0.35, green: 0.85, blue: 0.45, alpha: 1.0)
+            statusLabel.stringValue = "Fully Charged"
+            statusLabel.textColor = NSColor(white: 0.85, alpha: 1.0)
+        } else if isCritical {
             iconView.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: "Critical Battery")
             iconView.contentTintColor = NSColor(red: 1.0, green: 0.25, blue: 0.25, alpha: 1.0)
             statusLabel.stringValue = "Critical Battery — Plug in"
@@ -63,7 +75,11 @@ public final class BatteryView: NSView {
         } else if isCharging {
             iconView.image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Charging")
             iconView.contentTintColor = NSColor(red: 0.35, green: 0.85, blue: 0.45, alpha: 1.0)
-            statusLabel.stringValue = "Charging"
+            if let time = timeRemaining {
+                statusLabel.stringValue = "Charging • \(time)"
+            } else {
+                statusLabel.stringValue = "Charging"
+            }
             statusLabel.textColor = NSColor(white: 0.8, alpha: 1.0)
         } else if isLow {
             iconView.image = NSImage(systemSymbolName: "battery.25", accessibilityDescription: "Low Battery")
@@ -79,7 +95,28 @@ public final class BatteryView: NSView {
             
             iconView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Battery")
             iconView.contentTintColor = .white
-            statusLabel.stringValue = ""
+            if let time = timeRemaining {
+                statusLabel.stringValue = time
+                statusLabel.textColor = NSColor(white: 0.7, alpha: 1.0)
+            } else {
+                statusLabel.stringValue = ""
+            }
+        }
+    }
+    
+    public func updateCharger(isConnected: Bool, percent: Int) {
+        if isConnected {
+            iconView.image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Power Connected")
+            iconView.contentTintColor = NSColor(red: 0.35, green: 0.85, blue: 0.45, alpha: 1.0)
+            percentageLabel.stringValue = "Power Connected"
+            statusLabel.stringValue = "\(percent)%"
+            statusLabel.textColor = NSColor(white: 0.85, alpha: 1.0)
+        } else {
+            iconView.image = NSImage(systemSymbolName: "battery.100", accessibilityDescription: "Power Disconnected")
+            iconView.contentTintColor = NSColor(red: 1.0, green: 0.75, blue: 0.3, alpha: 1.0)
+            percentageLabel.stringValue = "Power Disconnected"
+            statusLabel.stringValue = "\(percent)%"
+            statusLabel.textColor = NSColor(white: 0.85, alpha: 1.0)
         }
     }
 }

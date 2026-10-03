@@ -86,6 +86,33 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Mini Timer Submenu
+        let timerMenuItem = NSMenuItem(title: "Mini Timer", action: nil, keyEquivalent: "")
+        let timerSubmenu = NSMenu(title: "Mini Timer")
+        
+        let timer5 = NSMenuItem(title: "Start 5 Minutes", action: #selector(handleStart5MinTimer), keyEquivalent: "")
+        timer5.target = self
+        timerSubmenu.addItem(timer5)
+        
+        let timer10 = NSMenuItem(title: "Start 10 Minutes", action: #selector(handleStart10MinTimer), keyEquivalent: "")
+        timer10.target = self
+        timerSubmenu.addItem(timer10)
+        
+        let timer25 = NSMenuItem(title: "Start 25 Minutes (Pomodoro)", action: #selector(handleStart25MinTimer), keyEquivalent: "")
+        timer25.target = self
+        timerSubmenu.addItem(timer25)
+        
+        timerSubmenu.addItem(NSMenuItem.separator())
+        
+        let cancelTimer = NSMenuItem(title: "Cancel Timer", action: #selector(handleCancelTimer), keyEquivalent: "")
+        cancelTimer.target = self
+        timerSubmenu.addItem(cancelTimer)
+        
+        timerMenuItem.submenu = timerSubmenu
+        menu.addItem(timerMenuItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         // Settings
         settingsItem.title = "Settings…"
         settingsItem.target = self
@@ -120,7 +147,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     public func updateActivity(_ activity: IslandActivity) {
         switch activity {
         case .idle:
-            activityStatusItem.title = "Current Activity: AHK MAC"
+            let name = DeviceIdentityManager.shared.fullIdlePresentation
+            activityStatusItem.title = "Current Activity: \(name)"
         case .appActivity(let app):
             activityStatusItem.title = "\(app.applicationName): \(app.stateText ?? "Active")"
         case .volume(let level, let isMuted):
@@ -129,8 +157,18 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             activityStatusItem.title = "☀️ Brightness \(Int(level * 100))%"
         case .battery(let level, let isCharging, _, _):
             activityStatusItem.title = isCharging ? "🔋 Battery \(Int(level * 100))% ⚡" : "🔋 Battery \(Int(level * 100))%"
-        case .nowPlaying:
-            activityStatusItem.title = "🎵 Music"
+        case .charger(let isConnected, let percent):
+            activityStatusItem.title = isConnected ? "⚡ Power Connected (\(percent)%)" : "🔋 Power Disconnected (\(percent)%)"
+        case .audioDevice(let name, _, _):
+            activityStatusItem.title = "🎧 Audio: \(name)"
+        case .network(let statusText, _, _):
+            activityStatusItem.title = "🌐 Network: \(statusText)"
+        case .timer(let remaining, _, let isCompleted):
+            activityStatusItem.title = isCompleted ? "⏱ Timer Complete" : "⏱ Timer: \(MiniTimerManager.format(remaining: remaining))"
+        case .clipboard(let status):
+            activityStatusItem.title = "📋 Clipboard: \(status)"
+        case .nowPlaying(let state):
+            activityStatusItem.title = "🎵 \(state.title)"
         case .download(let state):
             activityStatusItem.title = state.isCompleted ? "↓ Download Complete" : "↓ Downloading \(Int(state.progress * 100))%"
         case .fileTransfer(let state):
@@ -138,6 +176,24 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         case .notification(let title, _, _):
             activityStatusItem.title = "Alert: \(title)"
         }
+    }
+    
+    // MARK: - Mini Timer Actions
+    
+    @objc private func handleStart5MinTimer() {
+        MiniTimerManager.shared.startTimer(duration: 300)
+    }
+    
+    @objc private func handleStart10MinTimer() {
+        MiniTimerManager.shared.startTimer(duration: 600)
+    }
+    
+    @objc private func handleStart25MinTimer() {
+        MiniTimerManager.shared.startTimer(duration: 1500)
+    }
+    
+    @objc private func handleCancelTimer() {
+        MiniTimerManager.shared.cancelTimer()
     }
     
     public func updateExpandCollapseState(isExpanded: Bool) {

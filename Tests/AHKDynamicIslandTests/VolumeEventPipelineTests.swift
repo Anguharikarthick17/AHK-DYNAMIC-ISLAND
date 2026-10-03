@@ -28,8 +28,9 @@ final class VolumeEventPipelineTests: XCTestCase {
         }
         
         // 1. Initial State: Idle capsule
+        let expectedIdleSize = CGSize(width: DeviceIdentityManager.shared.idleCapsuleWidth, height: 26.0)
         XCTAssertEqual(coordinator.activeActivity, .idle)
-        XCTAssertEqual(windowController.window.frame.size, CGSize(width: 150.0, height: 26.0))
+        XCTAssertEqual(windowController.window.frame.size, expectedIdleSize)
         
         // 2. Inject VolumeEvent(level: 0.72, muted: false)
         let volumeActivity = IslandActivity.volume(level: 0.72, isMuted: false)
@@ -50,9 +51,9 @@ final class VolumeEventPipelineTests: XCTestCase {
         // 3. Verify Auto-Dismiss Interval is 1.8 seconds
         XCTAssertEqual(volumeActivity.autoDismissInterval ?? 0, 1.8, accuracy: 0.01)
         
-        // 4. Dismissal restores idle (150 x 26 pt)
+        // 4. Dismissal restores idle capsule
         coordinator.clearCurrentActivity()
         XCTAssertEqual(coordinator.activeActivity, .idle)
-        XCTAssertEqual(windowController.window.frame.size, CGSize(width: 150.0, height: 26.0))
+        XCTAssertEqual(windowController.window.frame.size, expectedIdleSize)
     }
 }

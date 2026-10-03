@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "AHK Dynamic Island - Universal Activity Bridge",
+  "version": "0.6.1",
+  "description": "Bridges universal Chrome tab, website, ChatGPT processing, and media activity to AHK Dynamic Island via Native Messaging.",
+  "permissions": [
+    "nativeMessaging",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.chatgpt.com/*",
+    "*://chat.openai.com/*",
+    "*://docs.google.com/*",
+    "*://github.com/*",
+    "*://mail.google.com/*",
+    "*://*.figma.com/*",
+    "*://open.spotify.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://open.spotify.com/*"
+      ],
+      "js": [
+        "media.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.chatgpt.com/*",
+        "*://chat.openai.com/*"
+      ],
+      "js": [
+        "chatgpt.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://docs.google.com/*"
+      ],
+      "js": [
+        "docs.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

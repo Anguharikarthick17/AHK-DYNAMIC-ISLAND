@@ -13,17 +13,18 @@ final class EventToWindowExpansionTests: XCTestCase {
             windowController.presentActivity(act, isExpanded: false, animated: false)
         }
         
-        // 1. Initially 150 x 26
-        XCTAssertEqual(windowController.window.frame.size, CGSize(width: 150.0, height: 26.0))
+        // 1. Initially idle capsule
+        let expectedIdleSize = CGSize(width: DeviceIdentityManager.shared.idleCapsuleWidth, height: 26.0)
+        XCTAssertEqual(windowController.window.frame.size, expectedIdleSize)
         
         // 2. Post volume -> 210 x 38
         coordinator.postActivity(.volume(level: 0.5, isMuted: false))
         XCTAssertEqual(windowController.window.frame.size, CGSize(width: 210.0, height: 38.0))
         XCTAssertEqual(windowController.window.frame.maxY, windowController.currentGeometry.anchorPoint.y, accuracy: 0.1)
         
-        // 3. Clear -> returns to 150 x 26
+        // 3. Clear -> returns to idle capsule
         coordinator.clearCurrentActivity()
-        XCTAssertEqual(windowController.window.frame.size, CGSize(width: 150.0, height: 26.0))
+        XCTAssertEqual(windowController.window.frame.size, expectedIdleSize)
     }
     
     func testIdleToNowPlayingExpanded() {

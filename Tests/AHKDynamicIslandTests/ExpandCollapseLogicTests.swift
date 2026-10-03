@@ -9,8 +9,9 @@ final class ExpandCollapseLogicTests: XCTestCase {
         let controller = IslandWindowController()
         
         // Initial state is collapsed
+        let expectedCollapsedSize = CGSize(width: DeviceIdentityManager.shared.idleCapsuleWidth, height: 26.0)
         XCTAssertEqual(controller.stateManager.currentState, .collapsed)
-        XCTAssertEqual(controller.window.frame.size, controller.currentGeometry.collapsedSize)
+        XCTAssertEqual(controller.window.frame.size, expectedCollapsedSize)
         XCTAssertFalse(controller.window.allowsKeyStatus)
         
         // Non-animated immediate expand
@@ -23,7 +24,7 @@ final class ExpandCollapseLogicTests: XCTestCase {
         // Non-animated immediate collapse
         controller.collapse(animated: false)
         XCTAssertEqual(controller.stateManager.currentState, .collapsed)
-        XCTAssertEqual(controller.window.frame.size, controller.currentGeometry.collapsedSize)
+        XCTAssertEqual(controller.window.frame.size, expectedCollapsedSize)
         XCTAssertFalse(controller.window.allowsKeyStatus)
         XCTAssertFalse(controller.islandView.isExpanded)
     }

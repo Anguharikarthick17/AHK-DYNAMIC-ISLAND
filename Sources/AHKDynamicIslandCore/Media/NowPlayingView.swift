@@ -20,6 +20,9 @@ public final class NowPlayingView: NSView {
     private let artistLabel = NSTextField(labelWithString: "")
     private let progressBar = NSProgressIndicator()
     
+    // Visual waveform indicator
+    public let waveformView = MediaWaveformView()
+    
     // Playback control buttons
     private let prevButton = NSButton()
     private let playPauseButton = NSButton()
@@ -57,6 +60,10 @@ public final class NowPlayingView: NSView {
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         addSubview(titleLabel)
+        
+        // Waveform indicator
+        waveformView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(waveformView)
         
         // Artist
         artistLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -103,8 +110,14 @@ public final class NowPlayingView: NSView {
             
             // Title
             titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 8),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: waveformView.leadingAnchor, constant: -6),
             titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+            
+            // Waveform (compact trailing indicator)
+            waveformView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            waveformView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            waveformView.widthAnchor.constraint(equalToConstant: 16),
+            waveformView.heightAnchor.constraint(equalToConstant: 16),
             
             // Artist (visible in expanded)
             artistLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
@@ -129,7 +142,7 @@ public final class NowPlayingView: NSView {
             playPauseButton.heightAnchor.constraint(equalToConstant: 22),
             
             prevButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -8),
-            prevButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            prevButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
             prevButton.widthAnchor.constraint(equalToConstant: 22),
             prevButton.heightAnchor.constraint(equalToConstant: 22)
         ])
@@ -138,7 +151,9 @@ public final class NowPlayingView: NSView {
     public func update(state: NowPlayingState, isExpanded: Bool) {
         self.isExpanded = isExpanded
         
-        titleLabel.stringValue = state.title
+        let prefix = state.isPlaying ? "♪ " : "Ⅱ "
+        let cleanTitle = state.title.hasPrefix("♪ ") || state.title.hasPrefix("Ⅱ ") ? state.title : "\(prefix)\(state.title)"
+        titleLabel.stringValue = isExpanded ? state.title : cleanTitle
         artistLabel.stringValue = state.artist
         progressBar.doubleValue = state.playbackProgress
         
@@ -146,6 +161,9 @@ public final class NowPlayingView: NSView {
         playPauseButton.image = NSImage(systemSymbolName: playIcon, accessibilityDescription: nil)
         
         // Visibility adjustments based on compact vs expanded
+        waveformView.isHidden = isExpanded
+        waveformView.setPlaying(state.isPlaying)
+        
         artistLabel.isHidden = !isExpanded
         progressBar.isHidden = !isExpanded
         prevButton.isHidden = !isExpanded

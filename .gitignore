@@ -5,3 +5,5 @@ xcuserdata/
 *.xcuserstate
 .build/
 *.app
+dist/
+*.dmg

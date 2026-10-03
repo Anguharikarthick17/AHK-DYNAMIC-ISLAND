@@ -12,7 +12,8 @@ public enum IslandSizeTier: String, Equatable, Sendable {
     public var defaultDimensions: CGSize {
         switch self {
         case .idle:
-            return CGSize(width: 150.0, height: 26.0)
+            let width = DeviceIdentityManager.shared.idleCapsuleWidth
+            return CGSize(width: width, height: 26.0)
         case .smallEvent:
             return CGSize(width: 220.0, height: 38.0)
         case .mediumEvent:
@@ -117,7 +118,10 @@ public final class IslandLayoutEngine: @unchecked Sendable {
         case .idle:
             return isExpanded ? .largeEvent : .idle
             
-        case .volume, .brightness:
+        case .volume, .brightness, .audioDevice, .network, .clipboard, .charger:
+            return isExpanded ? .mediumEvent : .smallEvent
+            
+        case .timer:
             return isExpanded ? .mediumEvent : .smallEvent
             
         case .battery(_, _, _, let isCritical):
@@ -156,6 +160,21 @@ public final class IslandLayoutEngine: @unchecked Sendable {
             
         case .brightness:
             return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 210.0, height: 38.0)
+            
+        case .charger:
+            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 220.0, height: 38.0)
+            
+        case .audioDevice:
+            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 220.0, height: 38.0)
+            
+        case .network:
+            return isExpanded ? CGSize(width: 250.0, height: 48.0) : CGSize(width: 215.0, height: 38.0)
+            
+        case .timer:
+            return isExpanded ? CGSize(width: 240.0, height: 50.0) : CGSize(width: 190.0, height: 34.0)
+            
+        case .clipboard:
+            return isExpanded ? CGSize(width: 220.0, height: 40.0) : CGSize(width: 180.0, height: 32.0)
             
         case .battery(_, _, _, let isCritical):
             if isCritical {

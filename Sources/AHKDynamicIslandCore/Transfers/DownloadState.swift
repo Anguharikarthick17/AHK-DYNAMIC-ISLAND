@@ -10,6 +10,7 @@ public struct DownloadState: Equatable, Sendable {
     public let speedBytesPerSec: Double
     public let isCompleted: Bool
     public let isFailed: Bool
+    public let appName: String?
     
     public init(
         id: UUID = UUID(),
@@ -18,7 +19,8 @@ public struct DownloadState: Equatable, Sendable {
         totalBytes: Int64,
         speedBytesPerSec: Double = 0.0,
         isCompleted: Bool = false,
-        isFailed: Bool = false
+        isFailed: Bool = false,
+        appName: String? = nil
     ) {
         self.id = id
         self.filename = filename
@@ -28,6 +30,7 @@ public struct DownloadState: Equatable, Sendable {
         self.speedBytesPerSec = speedBytesPerSec
         self.isCompleted = isCompleted
         self.isFailed = isFailed
+        self.appName = appName
     }
     
     public var formattedProgress: String {

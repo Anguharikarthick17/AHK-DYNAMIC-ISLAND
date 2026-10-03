@@ -12,12 +12,14 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
     public let animator: IslandAnimator
     public let displayObserver: DisplayObserver
     public let layoutEngine: IslandLayoutEngine
+    public let cursorAvoidanceController: CursorAvoidanceController
     
     public private(set) var currentGeometry: ScreenGeometryInfo
     
     public var onStateChanged: ((IslandDisplayState) -> Void)?
     public var onActivityChanged: ((IslandActivity) -> Void)?
     public var onVisibilityChanged: ((Bool) -> Void)?
+    public var onPresentationStateChanged: ((IslandPresentationState) -> Void)?
     
     public init(
         geometryProvider: NotchGeometryProvider = NotchGeometryProvider(),
@@ -41,8 +43,15 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
             screenGeometry: initialGeometry
         )
         
-        self.window = IslandWindow(contentRect: initialSpec.frame)
-        self.islandView = IslandView(frame: NSRect(origin: .zero, size: initialSpec.frame.size))
+        let win = IslandWindow(contentRect: initialSpec.frame)
+        let view = IslandView(frame: NSRect(origin: .zero, size: initialSpec.frame.size))
+        self.window = win
+        self.islandView = view
+        self.cursorAvoidanceController = CursorAvoidanceController(
+            window: win,
+            islandView: view,
+            stateManager: stateManager
+        )
         
         super.init()
         
@@ -54,14 +63,22 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
         islandView.delegate = self
         window.interactionDelegate = self
         
+        let initialSpec = layoutEngine.layoutSpec(
+            for: .idle,
+            isExpanded: false,
+            screenGeometry: currentGeometry
+        )
         islandView.applyLayout(
-            size: currentGeometry.collapsedSize,
-            cornerRadius: IslandSizeTier.idle.cornerRadius
+            size: initialSpec.size,
+            cornerRadius: initialSpec.cornerRadius
         )
         
         // Forward state notifications
         stateManager.onStateChanged = { [weak self] state in
             self?.onStateChanged?(state)
+        }
+        stateManager.onPresentationStateChanged = { [weak self] pState in
+            self?.onPresentationStateChanged?(pState)
         }
         stateManager.onActivityChanged = { [weak self] activity in
             self?.onActivityChanged?(activity)
@@ -100,11 +117,13 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
     
     public func show() {
         stateManager.setVisibility(true)
+        islandView.liquidAnimator.setVisibility(isVisible: true)
         window.orderFront(nil)
     }
     
     public func hide() {
         stateManager.setVisibility(false)
+        islandView.liquidAnimator.setVisibility(isVisible: false)
         window.orderOut(nil)
     }
     
@@ -182,6 +201,14 @@ public final class IslandWindowController: NSObject, IslandViewDelegate, IslandW
     
     public func islandViewDidRequestDismissActivity(_ view: IslandView) {
         presentActivity(.idle, isExpanded: false, animated: true)
+    }
+    
+    public func islandViewDidDetectCursorApproach(_ view: IslandView) {
+        cursorAvoidanceController.handleCursorEntered()
+    }
+    
+    public func islandViewDidDetectCursorExit(_ view: IslandView) {
+        cursorAvoidanceController.handleMouseMoved()
     }
     
     // MARK: - IslandWindowDelegate

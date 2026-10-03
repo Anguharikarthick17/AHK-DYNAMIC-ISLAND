@@ -8,15 +8,22 @@ public enum ActivityPriority: Int, Comparable, Sendable {
     case brightness = 15
     case appProcessing = 18
     case nowPlaying = 20
+    case timerRunning = 21
     case battery = 25
+    case clipboard = 28
     case fileTransfer = 30
+    case appTask = 32
+    case audioDevice = 35
+    case network = 36
+    case charger = 38
     case download = 40
+    case activityCompletion = 45
     case criticalAlert = 50
     
-    // Semantic priority aliases adhering to Section 21
+    // Semantic priority aliases adhering to Section 11 & Section 21
     public static let low = ActivityPriority.appActive
-    public static let medium = ActivityPriority.appProcessing
-    public static let high = ActivityPriority.volume
+    public static let medium = ActivityPriority.nowPlaying
+    public static let high = ActivityPriority.audioDevice
     public static let critical = ActivityPriority.criticalAlert
     
     public static func < (lhs: ActivityPriority, rhs: ActivityPriority) -> Bool {
@@ -30,6 +37,11 @@ public enum IslandActivity: Equatable, Sendable {
     case volume(level: Float, isMuted: Bool)
     case brightness(level: Float)
     case battery(level: Float, isCharging: Bool, isLow: Bool, isCritical: Bool)
+    case charger(isConnected: Bool, percent: Int)
+    case audioDevice(name: String, isConnected: Bool, icon: String)
+    case network(statusText: String, icon: String, isWarning: Bool)
+    case timer(remainingSeconds: TimeInterval, totalSeconds: TimeInterval, isCompleted: Bool)
+    case clipboard(statusText: String)
     case nowPlaying(state: NowPlayingState)
     case download(state: DownloadState)
     case fileTransfer(state: FileTransferState)
@@ -42,6 +54,12 @@ public enum IslandActivity: Equatable, Sendable {
         case .idle:
             return .idle
         case .appActivity(let activity):
+            if activity.activityState.isTerminal || activity.activityType == .completed || activity.activityType == .error {
+                return .activityCompletion
+            }
+            if activity.isOngoing {
+                return activity.priority > .appActive ? activity.priority : .appTask
+            }
             return activity.priority
         case .volume:
             return .volume
@@ -49,12 +67,22 @@ public enum IslandActivity: Equatable, Sendable {
             return .brightness
         case .battery(_, _, _, let isCritical):
             return isCritical ? .criticalAlert : .battery
+        case .charger:
+            return .charger
+        case .audioDevice:
+            return .audioDevice
+        case .network:
+            return .network
+        case .timer(_, _, let isCompleted):
+            return isCompleted ? .criticalAlert : .timerRunning
+        case .clipboard:
+            return .clipboard
         case .nowPlaying:
             return .nowPlaying
         case .fileTransfer:
             return .fileTransfer
-        case .download:
-            return .download
+        case .download(let state):
+            return state.isCompleted ? .download : .fileTransfer
         case .notification:
             return .fileTransfer
         }
@@ -69,6 +97,16 @@ public enum IslandActivity: Equatable, Sendable {
             return 1.8
         case .battery(_, _, _, let isCritical):
             return isCritical ? nil : 3.0
+        case .charger:
+            return 2.5
+        case .audioDevice:
+            return 2.2
+        case .network:
+            return 2.5
+        case .clipboard:
+            return 1.8
+        case .timer(_, _, let isCompleted):
+            return isCompleted ? 3.0 : nil // Active countdown remains persistent
         case .nowPlaying:
             return nil // Remains active while playing
         case .download(let state):
@@ -78,12 +116,12 @@ public enum IslandActivity: Equatable, Sendable {
         case .notification:
             return 3.5
         case .appActivity(let activity):
-            if activity.activityType.isOngoing {
+            if activity.activityState.isTerminal || activity.activityType == .completed || activity.activityType == .error {
+                return 2.5 // Short transient display for completion/failure
+            } else if activity.activityState.isOngoing || activity.activityType.isOngoing {
                 return nil // Persistent while actively building, rendering, playing, syncing
-            } else if activity.activityType == .completed {
-                return 2.0
             } else {
-                return 3.0 // Generic active presentation (auto-collapses to idle AHK MAC)
+                return 3.0 // Generic active presentation (auto-collapses to idle device identity)
             }
         }
     }
@@ -91,17 +129,23 @@ public enum IslandActivity: Equatable, Sendable {
     /// Whether this is a transient HUD event that temporarily interrupts persistent activities.
     public var isTransientHUD: Bool {
         switch self {
-        case .volume, .brightness:
+        case .volume, .brightness, .charger, .audioDevice, .network, .clipboard:
             return true
+        case .download(let state):
+            return state.isCompleted
+        case .timer(_, _, let isCompleted):
+            return isCompleted
+        case .appActivity(let activity):
+            return activity.activityState.isTerminal || activity.activityType == .completed || activity.activityType == .error
         default:
             return false
         }
     }
     
-    /// Whether this activity contains interactive elements (e.g. media controls).
+    /// Whether this activity contains interactive elements (e.g. media controls, timer tap).
     public var isInteractive: Bool {
         switch self {
-        case .nowPlaying:
+        case .nowPlaying, .timer:
             return true
         case .appActivity(let activity):
             return activity.activityType == .mediaPlaying
@@ -135,16 +179,32 @@ public enum IslandDisplayState: String, Equatable, Sendable {
     }
 }
 
+/// Dedicated presentation state for visual Dynamic Island behavior (independent of activity lifecycle).
+public enum IslandPresentationState: String, Equatable, Sendable {
+    case visible
+    case cursorAvoidanceHidden
+    case activityHidden
+    case transitioning
+}
+
 /// Manages dynamic island state and active activities.
 public final class IslandStateManager: @unchecked Sendable {
     
     public private(set) var currentState: IslandDisplayState
     public private(set) var currentActivity: IslandActivity
+    public private(set) var presentationState: IslandPresentationState = .visible
     public private(set) var isVisible: Bool
     
     public var onStateChanged: ((IslandDisplayState) -> Void)?
+    public var onPresentationStateChanged: ((IslandPresentationState) -> Void)?
     public var onActivityChanged: ((IslandActivity) -> Void)?
     public var onVisibilityChanged: ((Bool) -> Void)?
+    
+    public func setPresentationState(_ state: IslandPresentationState) {
+        guard state != presentationState else { return }
+        presentationState = state
+        onPresentationStateChanged?(state)
+    }
     
     public init(
         initialState: IslandDisplayState = .collapsed,

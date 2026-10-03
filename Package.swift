@@ -11,6 +11,10 @@ let package = Package(
             name: "AHKDynamicIsland",
             targets: ["AHKDynamicIsland"]
         ),
+        .executable(
+            name: "AHKChromeMediaHost",
+            targets: ["AHKChromeMediaHost"]
+        ),
         .library(
             name: "AHKDynamicIslandCore",
             targets: ["AHKDynamicIslandCore"]
@@ -25,6 +29,11 @@ let package = Package(
             name: "AHKDynamicIsland",
             dependencies: ["AHKDynamicIslandCore"],
             path: "Sources/AHKDynamicIsland"
+        ),
+        .executableTarget(
+            name: "AHKChromeMediaHost",
+            dependencies: ["AHKDynamicIslandCore"],
+            path: "Sources/AHKChromeMediaHost"
         ),
         .testTarget(
             name: "AHKDynamicIslandTests",

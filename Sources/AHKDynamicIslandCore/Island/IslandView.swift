@@ -7,6 +7,13 @@ import QuartzCore
 public protocol IslandViewDelegate: AnyObject {
     func islandViewDidRequestToggleExpandCollapse(_ view: IslandView)
     func islandViewDidRequestDismissActivity(_ view: IslandView)
+    func islandViewDidDetectCursorApproach(_ view: IslandView)
+    func islandViewDidDetectCursorExit(_ view: IslandView)
+}
+
+public extension IslandViewDelegate {
+    func islandViewDidDetectCursorApproach(_ view: IslandView) {}
+    func islandViewDidDetectCursorExit(_ view: IslandView) {}
 }
 
 /// Dynamic Island presentation view adapting size, content, and styling to the active activity.
@@ -22,9 +29,13 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     // Activity Container
     private let contentContainerView = NSView()
     
+    // Liquid Glass Motion & Shine Orchestrator
+    public let liquidAnimator = LiquidIslandAnimator()
+    
     // Modular Subviews
-    private let idleView = NSView()
-    public let idleLabel = NSTextField(labelWithString: "AHK MAC")
+    public let idleView = NSView()
+    public let signatureLabel = NSTextField(labelWithString: "✦")
+    public let idleLabel = NSTextField(labelWithString: DeviceIdentityManager.shared.computerName)
     
     public let appActivityView = AppActivityView()
     public let volumeView = VolumeView()
@@ -34,6 +45,10 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     public let downloadView = DownloadView()
     public let fileTransferView = FileTransferView()
     public let notificationView = ActivityNotificationView()
+    public let audioDeviceView = AudioDeviceView()
+    public let networkView = NetworkStateView()
+    public let timerView = MiniTimerView()
+    public let clipboardView = ClipboardView()
     
     public private(set) var currentActivity: IslandActivity = .idle
     public private(set) var isExpanded: Bool = false
@@ -69,35 +84,68 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         setupModularViews()
         setupConstraints()
         
+        liquidAnimator.surface = glassContainer.surface
+        liquidAnimator.updateActivityState(.idle)
+        
         // Initial idle presentation
-        applyLayout(size: CGSize(width: 150, height: 26), cornerRadius: 13.0)
+        let initialWidth = DeviceIdentityManager.shared.idleCapsuleWidth
+        applyLayout(size: CGSize(width: initialWidth, height: 26), cornerRadius: 13.0)
         showView(for: .idle)
     }
     
     private func setupIdleView() {
         idleView.translatesAutoresizingMaskIntoConstraints = false
+        
+        signatureLabel.translatesAutoresizingMaskIntoConstraints = false
+        signatureLabel.isEditable = false
+        signatureLabel.isSelectable = false
+        signatureLabel.isBezeled = false
+        signatureLabel.drawsBackground = false
+        signatureLabel.font = NSFont.systemFont(ofSize: 8.5, weight: .semibold)
+        signatureLabel.alignment = .center
+        signatureLabel.setContentHuggingPriority(.required, for: .horizontal)
+        signatureLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        
         idleLabel.translatesAutoresizingMaskIntoConstraints = false
         idleLabel.isEditable = false
         idleLabel.isSelectable = false
         idleLabel.isBezeled = false
         idleLabel.drawsBackground = false
         idleLabel.alignment = .center
+        idleLabel.maximumNumberOfLines = 1
+        idleLabel.usesSingleLineMode = true
+        idleLabel.lineBreakMode = .byTruncatingTail
+        idleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
-        let font = NSFont.systemFont(ofSize: 11.5, weight: .semibold)
-        let attrString = NSMutableAttributedString(string: "AHK MAC")
-        attrString.addAttributes([
-            .font: font,
-            .kern: 1.2
-        ], range: NSRange(location: 0, length: 7))
-        idleLabel.attributedStringValue = attrString
+        let stack = NSStackView(views: [signatureLabel, idleLabel])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 4.5
+        stack.distribution = .fill
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        idleView.addSubview(stack)
         
-        idleView.addSubview(idleLabel)
+        updateIdleIdentity()
+        
         NSLayoutConstraint.activate([
-            idleLabel.centerXAnchor.constraint(equalTo: idleView.centerXAnchor),
-            idleLabel.centerYAnchor.constraint(equalTo: idleView.centerYAnchor)
+            stack.centerXAnchor.constraint(equalTo: idleView.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: idleView.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: idleView.leadingAnchor, constant: 8),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: idleView.trailingAnchor, constant: -8)
         ])
         
         updateIdleAppearance()
+    }
+    
+    public func updateIdleIdentity(name: String? = nil) {
+        let text = name ?? DeviceIdentityManager.shared.fullIdlePresentation
+        let font = NSFont.systemFont(ofSize: 11.0, weight: .semibold)
+        let attrString = NSMutableAttributedString(string: text)
+        attrString.addAttributes([
+            .font: font,
+            .kern: 0.6
+        ], range: NSRange(location: 0, length: text.utf16.count))
+        idleLabel.attributedStringValue = attrString
     }
     
     public override func viewDidChangeEffectiveAppearance() {
@@ -108,6 +156,7 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     private func updateIdleAppearance() {
         let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         idleLabel.textColor = isDark ? NSColor(white: 0.94, alpha: 0.90) : NSColor(white: 0.12, alpha: 0.88)
+        signatureLabel.textColor = isDark ? NSColor(white: 0.90, alpha: 0.50) : NSColor(white: 0.20, alpha: 0.50)
     }
     
     private func setupModularViews() {
@@ -115,7 +164,8 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         
         let allViews: [NSView] = [
             idleView, appActivityView, volumeView, brightnessView, batteryView,
-            nowPlayingView, downloadView, fileTransferView, notificationView
+            nowPlayingView, downloadView, fileTransferView, notificationView,
+            audioDeviceView, networkView, timerView, clipboardView
         ]
         
         for view in allViews {
@@ -160,6 +210,9 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         // Update glass interactivity
         glassContainer.isInteractive = (activity.isInteractive || isExpanded)
         
+        // Update liquid glass motion & shine system
+        liquidAnimator.updateActivityState(activity)
+        
         showView(for: activity)
         updateActiveView(activity: activity, isExpanded: isExpanded)
     }
@@ -173,8 +226,16 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
             activeTargetView = volumeView
         case .brightness:
             activeTargetView = brightnessView
-        case .battery:
+        case .battery, .charger:
             activeTargetView = batteryView
+        case .audioDevice:
+            activeTargetView = audioDeviceView
+        case .network:
+            activeTargetView = networkView
+        case .timer:
+            activeTargetView = timerView
+        case .clipboard:
+            activeTargetView = clipboardView
         case .nowPlaying:
             activeTargetView = nowPlayingView
         case .download:
@@ -189,7 +250,8 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         
         let allViews: [NSView] = [
             idleView, appActivityView, volumeView, brightnessView, batteryView,
-            nowPlayingView, downloadView, fileTransferView, notificationView
+            nowPlayingView, downloadView, fileTransferView, notificationView,
+            audioDeviceView, networkView, timerView, clipboardView
         ]
         
         for view in allViews {
@@ -200,7 +262,7 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
     private func updateActiveView(activity: IslandActivity, isExpanded: Bool) {
         switch activity {
         case .idle:
-            break
+            updateIdleIdentity()
         case .appActivity(let activity):
             appActivityView.update(activity: activity, isExpanded: isExpanded)
         case .volume(let level, let isMuted):
@@ -209,6 +271,16 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
             brightnessView.update(level: level)
         case .battery(let level, let isCharging, let isLow, let isCritical):
             batteryView.update(level: level, isCharging: isCharging, isLow: isLow, isCritical: isCritical)
+        case .charger(let isConnected, let percent):
+            batteryView.updateCharger(isConnected: isConnected, percent: percent)
+        case .audioDevice(let name, let isConnected, let icon):
+            audioDeviceView.update(name: name, isConnected: isConnected, icon: icon)
+        case .network(let statusText, let icon, let isWarning):
+            networkView.update(statusText: statusText, icon: icon, isWarning: isWarning)
+        case .timer(let remaining, let total, let isCompleted):
+            timerView.update(remainingSeconds: remaining, totalSeconds: total, isCompleted: isCompleted)
+        case .clipboard(let statusText):
+            clipboardView.update(statusText: statusText)
         case .nowPlaying(let state):
             nowPlayingView.update(state: state, isExpanded: isExpanded)
         case .download(let state):
@@ -240,6 +312,35 @@ public final class IslandView: NSView, NowPlayingViewDelegate {
         }
         
         delegate?.islandViewDidRequestToggleExpandCollapse(self)
+    }
+    
+    // MARK: - Cursor Tracking for Auto-Hide
+    
+    private var cursorTrackingArea: NSTrackingArea?
+    
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = cursorTrackingArea {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        self.cursorTrackingArea = area
+    }
+    
+    public override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        delegate?.islandViewDidDetectCursorApproach(self)
+    }
+    
+    public override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        delegate?.islandViewDidDetectCursorExit(self)
     }
     
     // MARK: - NowPlayingViewDelegate

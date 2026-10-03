@@ -5,10 +5,12 @@ import AppKit
 @MainActor
 final class LiveCapsuleAndRestorationTests: XCTestCase {
     
-    func testPersistentIdleIdentityAHKMAC() {
+    func testPersistentIdleIdentityDynamicComputerName() {
         let view = IslandView(frame: NSRect(x: 0, y: 0, width: 150, height: 26))
         
-        XCTAssertEqual(view.idleLabel.stringValue, "AHK MAC")
+        let expectedName = DeviceIdentityManager.shared.computerName
+        XCTAssertEqual(view.idleLabel.stringValue, expectedName)
+        XCTAssertNotEqual(view.idleLabel.stringValue, "AHK MAC", "Hardcoded 'AHK MAC' must not remain as the idle identity")
         XCTAssertEqual(view.idleLabel.alignment, .center)
         XCTAssertFalse(view.idleLabel.isEditable)
     }
@@ -18,9 +20,10 @@ final class LiveCapsuleAndRestorationTests: XCTestCase {
         let dummyScreen = NSScreen.main ?? NSScreen.screens[0]
         let geometry = NotchGeometryProvider().geometry(for: dummyScreen)
         
-        // 1. Idle state (AHK MAC)
+        // 1. Idle state (Dynamic Computer Name)
+        let expectedIdleWidth = DeviceIdentityManager.shared.idleCapsuleWidth
         let idleSpec = layoutEngine.layoutSpec(for: .idle, isExpanded: false, screenGeometry: geometry)
-        XCTAssertEqual(idleSpec.size, CGSize(width: 150.0, height: 26.0))
+        XCTAssertEqual(idleSpec.size, CGSize(width: expectedIdleWidth, height: 26.0))
         XCTAssertEqual(idleSpec.cornerRadius, 13.0)
         
         // 2. Generic App Activity
@@ -43,7 +46,7 @@ final class LiveCapsuleAndRestorationTests: XCTestCase {
     func testAppActivityPreemptionAndRestorationPipeline() {
         let coordinator = IslandEventCoordinator()
         
-        // 1. Initially idle (AHK MAC)
+        // 1. Initially idle (dynamic device identity)
         XCTAssertEqual(coordinator.activeActivity, .idle)
         
         // 2. App activation occurs: Terminal • Active
@@ -68,7 +71,7 @@ final class LiveCapsuleAndRestorationTests: XCTestCase {
         coordinator.clearCurrentActivity()
         XCTAssertEqual(coordinator.activeActivity, appAct)
         
-        // 5. App deactivates / completes -> restores idle AHK MAC
+        // 5. App deactivates / completes -> restores idle dynamic identity
         coordinator.clearCurrentActivity()
         XCTAssertEqual(coordinator.activeActivity, .idle)
     }

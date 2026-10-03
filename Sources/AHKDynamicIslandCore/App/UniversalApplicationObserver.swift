@@ -124,6 +124,7 @@ public final class UniversalApplicationObserver: NSObject {
         if currentFrontmostApp?.bundleIdentifier == discovered.bundleIdentifier {
             currentFrontmostApp = nil
         }
+        registry.removeActivity(bundleIdentifier: discovered.bundleIdentifier)
         onApplicationTerminated?(discovered)
     }
     

@@ -75,9 +75,52 @@ public enum UniversalActivityType: String, Equatable, Sendable {
     }
 }
 
+/// Lifecycle and operational state of a universal application activity.
+public enum UniversalActivityState: String, Equatable, Sendable, CaseIterable {
+    case idle
+    case active
+    case working
+    case processing
+    case building
+    case compiling
+    case testing
+    case rendering
+    case exporting
+    case uploading
+    case downloading
+    case installing
+    case playing
+    case paused
+    case waiting
+    case completed
+    case failed
+    case cancelled
+    
+    /// Whether this state represents a finished task.
+    public var isTerminal: Bool {
+        switch self {
+        case .completed, .failed, .cancelled:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    /// Whether this state represents an ongoing, active background workload.
+    public var isOngoing: Bool {
+        switch self {
+        case .active, .working, .processing, .building, .compiling, .testing,
+             .rendering, .exporting, .uploading, .downloading, .installing, .playing, .waiting:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 /// Confidence rating for detected application activity.
-/// HIGH: macOS publicly exposes the exact activity (e.g. Media Now Playing, explicit cooperate event).
-/// MEDIUM: activity can reasonably be determined through public system signals.
+/// HIGH: macOS or application publicly and explicitly exposes exact telemetry.
+/// MEDIUM: activity can reasonably be determined through legitimate public system signals.
 /// LOW: only generic application identity/active state is known. Never turn weak signals into fake precision.
 public enum ActivityConfidence: Int, Equatable, Comparable, Sendable {
     case low = 1
@@ -125,17 +168,78 @@ public struct DiscoveredApplication: Equatable, Sendable {
 
 /// Unified model representing an application activity across macOS.
 public struct UniversalAppActivity: Equatable, Sendable {
+    public var applicationIdentity: String { bundleIdentifier }
     public let applicationName: String
     public let bundleIdentifier: String
     public let activityType: UniversalActivityType
-    public let stateText: String?
+    public let activityTitle: String
+    public let activitySubtitle: String?
+    public let activityState: UniversalActivityState
+    public let progress: Double?
+    public let isIndeterminate: Bool
     public let priority: ActivityPriority
-    public let timestamp: Date
-    public let metadata: [String: String]
     public let confidence: ActivityConfidence
     public let source: String
+    public let startedAt: Date
+    public let updatedAt: Date
+    public let estimatedCompletion: Date?
+    public let icon: String?
     public let glyph: String?
+    public let metadata: [String: String]
     
+    // Backward compatibility property for V0.3.1/V0.4
+    public var stateText: String? {
+        if let subtitle = activitySubtitle, !subtitle.isEmpty {
+            return subtitle
+        }
+        return activityState == .active ? "Active" : activityState.rawValue.capitalized
+    }
+    
+    // Backward compatibility alias for timestamp
+    public var timestamp: Date {
+        return updatedAt
+    }
+    
+    /// Modern rich initializer for V0.5 live activity intelligence.
+    public init(
+        applicationName: String,
+        bundleIdentifier: String,
+        activityType: UniversalActivityType = .appActive,
+        activityTitle: String? = nil,
+        activitySubtitle: String? = nil,
+        activityState: UniversalActivityState = .active,
+        progress: Double? = nil,
+        isIndeterminate: Bool = false,
+        priority: ActivityPriority = .appActive,
+        confidence: ActivityConfidence = .low,
+        source: String = "UniversalDiscovery",
+        startedAt: Date = Date(),
+        updatedAt: Date = Date(),
+        estimatedCompletion: Date? = nil,
+        glyph: String? = nil,
+        icon: String? = nil,
+        metadata: [String: String] = [:]
+    ) {
+        self.applicationName = applicationName
+        self.bundleIdentifier = bundleIdentifier
+        self.activityType = activityType
+        self.activityTitle = activityTitle ?? applicationName
+        self.activitySubtitle = activitySubtitle
+        self.activityState = activityState
+        self.progress = progress
+        self.isIndeterminate = isIndeterminate
+        self.priority = priority
+        self.confidence = confidence
+        self.source = source
+        self.startedAt = startedAt
+        self.updatedAt = updatedAt
+        self.estimatedCompletion = estimatedCompletion
+        self.glyph = glyph ?? UniversalAppActivity.resolveCategoryGlyph(applicationName: applicationName, bundleIdentifier: bundleIdentifier, activityType: activityType)
+        self.icon = icon
+        self.metadata = metadata
+    }
+    
+    /// Backward-compatible initializer matching exact V0.3.1 & V0.4 signature and argument ordering.
     public init(
         applicationName: String,
         bundleIdentifier: String,
@@ -151,24 +255,55 @@ public struct UniversalAppActivity: Equatable, Sendable {
         self.applicationName = applicationName
         self.bundleIdentifier = bundleIdentifier
         self.activityType = activityType
-        self.stateText = stateText
+        self.activityTitle = applicationName
+        self.activitySubtitle = stateText
+        self.activityState = .active
+        self.progress = nil
+        self.isIndeterminate = false
         self.priority = priority
-        self.timestamp = timestamp
-        self.metadata = metadata
         self.confidence = confidence
         self.source = source
+        self.startedAt = timestamp
+        self.updatedAt = timestamp
+        self.estimatedCompletion = nil
         self.glyph = glyph ?? UniversalAppActivity.resolveCategoryGlyph(applicationName: applicationName, bundleIdentifier: bundleIdentifier, activityType: activityType)
+        self.icon = nil
+        self.metadata = metadata
+    }
+    
+    /// Whether this activity represents a long-running background task (e.g. building, rendering, exporting).
+    public var isTask: Bool {
+        switch activityState {
+        case .working, .processing, .building, .compiling, .testing,
+             .rendering, .exporting, .uploading, .downloading, .installing, .playing:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    /// Whether this activity represents an ongoing persistent task.
+    public var isOngoing: Bool {
+        if activityState.isTerminal {
+            return false
+        }
+        if isTask {
+            return true
+        }
+        return activityType.isOngoing && activityType != .appActive
     }
     
     /// Formatted presentation title for the activity capsule.
     /// Follows guidelines:
-    /// - Building: ⚒ Xcode • Building
+    /// - Building: ⚒ Xcode • Building MyApp
     /// - Media: ▶ Chrome • Playing
     /// - Rendering: ◉ DaVinci • Rendering
     /// - Generic Active: ⌘ Terminal • Active or ◇ Figma • Active
     public var formattedTitle: String {
         let prefix = glyph ?? activityType.defaultGlyph
-        if let state = stateText, !state.isEmpty {
+        if let subtitle = activitySubtitle, !subtitle.isEmpty {
+            return "\(prefix) \(applicationName) • \(subtitle)"
+        } else if let state = stateText, !state.isEmpty {
             return "\(prefix) \(applicationName) • \(state)"
         } else {
             return "\(prefix) \(applicationName)"
